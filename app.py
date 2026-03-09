@@ -11,7 +11,6 @@ scope = [
 ]
 
 service_account_info = dict(st.secrets["gcp_service_account"])
-service_account_info["private_key"] = service_account_info["private_key"].replace("\\n", "\n")
 
 credentials = Credentials.from_service_account_info(
     service_account_info,
@@ -504,6 +503,7 @@ elif prueba == "Levantarse de silla":
                         clasificacion=clasificacion
                     )
                     st.success("Evaluación guardada correctamente.")
+
 
 
 
