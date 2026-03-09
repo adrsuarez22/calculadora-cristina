@@ -529,53 +529,33 @@ if paciente and str(paciente).strip() != "":
     df_historial = obtener_historial_paciente(paciente)
 
     if not df_historial.empty:
-        # Filtrar solo la prueba seleccionada
-        if "prueba" in df_historial.columns:
-            df_historial = df_historial[
-                df_historial["prueba"].astype(str).str.strip() == str(prueba).strip()
-            ].copy()
+        columnas_mostrar = ["fecha", "prueba", "valor_medido", "percentilo", "clasificacion"]
+        columnas_existentes = [c for c in columnas_mostrar if c in df_historial.columns]
+        df_historial_mostrar = df_historial[columnas_existentes].copy()
 
-        if not df_historial.empty:
-            columnas_mostrar = ["fecha", "prueba", "valor_medido", "percentilo", "clasificacion"]
-            columnas_existentes = [c for c in columnas_mostrar if c in df_historial.columns]
-            df_historial_mostrar = df_historial[columnas_existentes].copy()
+        if "fecha" in df_historial_mostrar.columns:
+            df_historial_mostrar["fecha"] = pd.to_datetime(
+                df_historial_mostrar["fecha"],
+                errors="coerce"
+            ).dt.strftime("%Y-%m-%d")
 
-            if "fecha" in df_historial_mostrar.columns:
-                df_historial_mostrar["fecha"] = pd.to_datetime(
-                    df_historial_mostrar["fecha"],
-                    errors="coerce"
-                ).dt.strftime("%Y-%m-%d")
+        st.dataframe(
+            df_historial_mostrar,
+            use_container_width=True,
+            hide_index=True
+        )
 
-            st.dataframe(
-                df_historial_mostrar,
-                use_container_width=True,
-                hide_index=True
-            )
+        if "fecha" in df_historial.columns and "percentilo" in df_historial.columns:
+            df_graf = df_historial.copy()
+            df_graf["fecha"] = pd.to_datetime(df_graf["fecha"], errors="coerce")
+            df_graf["percentilo"] = pd.to_numeric(df_graf["percentilo"], errors="coerce")
+            df_graf = df_graf.dropna(subset=["fecha", "percentilo"]).sort_values("fecha")
 
-            # Gráfico de evolución solo para la prueba seleccionada
-            if "fecha" in df_historial.columns and "percentilo" in df_historial.columns:
-                df_graf = df_historial.copy()
-
-                df_graf["fecha"] = pd.to_datetime(df_graf["fecha"], errors="coerce")
-                df_graf["percentilo"] = pd.to_numeric(df_graf["percentilo"], errors="coerce")
-
-                df_graf = df_graf.dropna(subset=["fecha", "percentilo"])
-
-                # Si hubiera más de un registro de la misma prueba en la misma fecha,
-                # se promedia para evitar líneas verticales o puntos superpuestos.
-                df_graf = (
-                    df_graf.groupby("fecha", as_index=False)["percentilo"]
-                    .mean()
-                    .sort_values("fecha")
+            if not df_graf.empty:
+                st.markdown("### Evolución del percentil")
+                st.line_chart(
+                    df_graf.set_index("fecha")["percentilo"],
+                    use_container_width=True
                 )
-
-                if not df_graf.empty:
-                    st.markdown(f"### Evolución del percentil - {prueba}")
-                    st.line_chart(
-                        df_graf.set_index("fecha")["percentilo"],
-                        use_container_width=True
-                    )
-        else:
-            st.info(f"No hay evaluaciones guardadas para la prueba '{prueba}' en este paciente.")
     else:
         st.info("Todavía no hay evaluaciones guardadas para este paciente.")
