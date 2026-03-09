@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import unicodedata
 import gspread
+import json
 from google.oauth2.service_account import Credentials
 from datetime import datetime
 
@@ -10,15 +11,17 @@ scope = [
     "https://www.googleapis.com/auth/drive"
 ]
 
+service_account_info = json.loads(st.secrets["gcp_service_account_json"])
+
 credentials = Credentials.from_service_account_info(
-    st.secrets["gcp_service_account"], scopes=scope
+    service_account_info,
+    scopes=scope
 )
 
 client = gspread.authorize(credentials)
 sheet = client.open("Evaluaciones_Funcionales").sheet1
 
 st.set_page_config(page_title="Calculadora de Condición Física", layout="centered")
-
 
 # =========================
 # Utilidades generales
@@ -487,3 +490,4 @@ elif prueba == "Levantarse de silla":
                         clasificacion=clasificacion
                     )
                     st.success("Evaluación guardada correctamente.")
+
