@@ -175,7 +175,6 @@ def obtener_etiqueta_semaforo(p):
     else:
         return "Alto"
 
-
 def interpretar_clinicamente(p, prueba):
     if p is None:
         return "No se pudo estimar el percentil."
@@ -491,3 +490,4 @@ elif prueba == "Levantarse de silla":
                         st.success("Evaluación guardada correctamente.")
                     except Exception as e:
                         st.error(f"Error al guardar: {e}")
+
