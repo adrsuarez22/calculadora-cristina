@@ -26,20 +26,7 @@ def guardar_evaluacion(paciente, sexo, edad, prueba, valor_medido, percentil, cl
 
     respuesta = supabase.table("evaluaciones").insert(payload).execute()
     return respuesta
-    
-scope = [
-    "https://www.googleapis.com/auth/spreadsheets",
-    "https://www.googleapis.com/auth/drive"
-]
 
-credentials = Credentials.from_service_account_info(
-    st.secrets["gcp_service_account"],
-    scopes=scope
-)
-client = gspread.authorize(credentials)
-sheet = client.open("Evaluaciones_Funcionales").sheet1
-
-st.set_page_config(page_title="Calculadora de Condición Física", layout="centered")
 
 # =========================
 # Utilidades generales
@@ -291,19 +278,6 @@ def mostrar_semaforo(p):
     )
 
 
-def guardar_evaluacion(paciente, sexo, edad, prueba, valor_medido, percentil, clasificacion):
-    sheet.append_row([
-        datetime.now().strftime("%Y-%m-%d"),
-        paciente,
-        sexo,
-        int(edad),
-        prueba,
-        float(valor_medido),
-        round(float(percentil), 1) if percentil is not None else "",
-        clasificacion
-    ])
-
-
 # =========================
 # Carga de datos
 # =========================
@@ -405,16 +379,19 @@ if prueba == "Caminata 6 minutos":
             if paciente.strip() == "":
                 st.error("Debés completar el nombre del paciente antes de guardar.")
             else:
-                guardar_evaluacion(
-                    paciente=paciente.strip(),
-                    sexo=sexo_global,
-                    edad=edad,
-                    prueba=prueba,
-                    valor_medido=valor_medido,
-                    percentil=p_est,
-                    clasificacion=clasificacion
-                )
-                st.success("Evaluación guardada correctamente.")
+                try:
+                    guardar_evaluacion(
+                        paciente=paciente.strip(),
+                        sexo=sexo_global,
+                        edad=edad,
+                        prueba=prueba,
+                        valor_medido=valor_medido,
+                        percentil=p_est,
+                        clasificacion=clasificacion
+                    )
+                    st.success("Evaluación guardada correctamente.")
+                except Exception as e:
+                    st.error(f"Error al guardar: {e}")
 
 elif prueba == "Fuerza prensión":
     df, cols = cargar_prension()
@@ -452,16 +429,19 @@ elif prueba == "Fuerza prensión":
                 if paciente.strip() == "":
                     st.error("Debés completar el nombre del paciente antes de guardar.")
                 else:
-                    guardar_evaluacion(
-                        paciente=paciente.strip(),
-                        sexo=sexo,
-                        edad=edad,
-                        prueba=prueba,
-                        valor_medido=valor_medido,
-                        percentil=p_est,
-                        clasificacion=clasificacion
-                    )
-                    st.success("Evaluación guardada correctamente.")
+                    try:
+                        guardar_evaluacion(
+                            paciente=paciente.strip(),
+                            sexo=sexo,
+                            edad=edad,
+                            prueba=prueba,
+                            valor_medido=valor_medido,
+                            percentil=p_est,
+                            clasificacion=clasificacion
+                        )
+                        st.success("Evaluación guardada correctamente.")
+                    except Exception as e:
+                        st.error(f"Error al guardar: {e}")
 
 elif prueba == "Levantarse de silla":
     df, cols = cargar_silla()
@@ -498,18 +478,16 @@ elif prueba == "Levantarse de silla":
                 if paciente.strip() == "":
                     st.error("Debés completar el nombre del paciente antes de guardar.")
                 else:
-                    guardar_evaluacion(
-                        paciente=paciente.strip(),
-                        sexo=sexo,
-                        edad=edad,
-                        prueba=prueba,
-                        valor_medido=valor_medido,
-                        percentil=p_est,
-                        clasificacion=clasificacion
-                    )
-                    st.success("Evaluación guardada correctamente.")
-
-
-
-
-
+                    try:
+                        guardar_evaluacion(
+                            paciente=paciente.strip(),
+                            sexo=sexo,
+                            edad=edad,
+                            prueba=prueba,
+                            valor_medido=valor_medido,
+                            percentil=p_est,
+                            clasificacion=clasificacion
+                        )
+                        st.success("Evaluación guardada correctamente.")
+                    except Exception as e:
+                        st.error(f"Error al guardar: {e}")
