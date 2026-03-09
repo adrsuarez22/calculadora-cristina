@@ -1,6 +1,21 @@
 import streamlit as st
 import pandas as pd
 import unicodedata
+import gspread
+from google.oauth2.service_account import Credentials
+from datetime import datetime
+
+scope = [
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/drive"
+]
+
+credentials = Credentials.from_service_account_info(
+    st.secrets["gcp_service_account"], scopes=scope
+)
+
+client = gspread.authorize(credentials)
+sheet = client.open("Evaluaciones_Funcionales").sheet1
 
 st.set_page_config(page_title="Calculadora de Condición Física", layout="centered")
 
@@ -131,13 +146,13 @@ def obtener_color_percentil(p):
     if p is None:
         return "#9E9E9E"
     if p < 10:
-        return "#D32F2F"   # rojo
+        return "#D32F2F"
     elif p < 25:
-        return "#F57C00"   # naranja
+        return "#F57C00"
     elif p <= 75:
-        return "#388E3C"   # verde
+        return "#388E3C"
     else:
-        return "#1976D2"   # azul
+        return "#1976D2"
 
 
 def obtener_etiqueta_semaforo(p):
@@ -255,6 +270,19 @@ def mostrar_semaforo(p):
     )
 
 
+def guardar_evaluacion(paciente, sexo, edad, prueba, valor_medido, percentil, clasificacion):
+    sheet.append_row([
+        datetime.now().strftime("%Y-%m-%d"),
+        paciente,
+        sexo,
+        int(edad),
+        prueba,
+        float(valor_medido),
+        round(float(percentil), 1) if percentil is not None else "",
+        clasificacion
+    ])
+
+
 # =========================
 # Carga de datos
 # =========================
@@ -315,6 +343,10 @@ def cargar_silla():
 # =========================
 st.title("Calculadora de Condición Física")
 
+paciente = st.text_input("Paciente")
+sexo_ui_global = st.selectbox("Sexo", ["Hombre", "Mujer"])
+sexo_global = formatear_sexo_ui(sexo_ui_global)
+
 prueba = st.selectbox(
     "Seleccionar prueba",
     ["Caminata 6 minutos", "Fuerza prensión", "Levantarse de silla"]
@@ -339,6 +371,7 @@ if prueba == "Caminata 6 minutos":
         p50_texto = f"{float(p50.iloc[0]):.0f} m" if not p50.empty else "No disponible"
 
         p_est, texto_p, rango_p = estimar_percentil(valor_medido, ref, cols["resultado"], cols["percentil"])
+        clasificacion = obtener_etiqueta_semaforo(p_est)
 
         mostrar_semaforo(p_est)
         st.success(texto_p)
@@ -347,13 +380,27 @@ if prueba == "Caminata 6 minutos":
         st.write(f"**Referencia P50:** {p50_texto}")
         st.write(f"**Interpretación clínica:** {interpretar_clinicamente(p_est, prueba)}")
 
+        if st.button("Guardar evaluación", key="guardar_caminata"):
+            if paciente.strip() == "":
+                st.error("Debés completar el nombre del paciente antes de guardar.")
+            else:
+                guardar_evaluacion(
+                    paciente=paciente.strip(),
+                    sexo=sexo_global,
+                    edad=edad,
+                    prueba=prueba,
+                    valor_medido=valor_medido,
+                    percentil=p_est,
+                    clasificacion=clasificacion
+                )
+                st.success("Evaluación guardada correctamente.")
+
 elif prueba == "Fuerza prensión":
     df, cols = cargar_prension()
 
-    sexo_ui = st.selectbox("Sexo", ["Hombre", "Mujer"])
-    sexo = formatear_sexo_ui(sexo_ui)
+    sexo = sexo_global
     edad = st.number_input("Edad", min_value=20, max_value=110, value=60, step=1)
-    fuerza_medida = st.number_input("Fuerza medida (kg)", min_value=0.0, value=25.0, step=0.1)
+    valor_medido = st.number_input("Fuerza medida (kg)", min_value=0.0, value=25.0, step=0.1)
 
     rangos = sorted(df[cols["edad"]].dropna().astype(str).unique().tolist())
     rango_edad = buscar_rango_edad_prension(edad, rangos)
@@ -369,7 +416,8 @@ elif prueba == "Fuerza prensión":
             p50 = ref.loc[ref[cols["percentil"]] == 50, cols["resultado"]]
             p50_texto = f"{float(p50.iloc[0]):.1f} kg" if not p50.empty else "No disponible"
 
-            p_est, texto_p, rango_p = estimar_percentil(fuerza_medida, ref, cols["resultado"], cols["percentil"])
+            p_est, texto_p, rango_p = estimar_percentil(valor_medido, ref, cols["resultado"], cols["percentil"])
+            clasificacion = obtener_etiqueta_semaforo(p_est)
 
             mostrar_semaforo(p_est)
             st.success(texto_p)
@@ -379,13 +427,27 @@ elif prueba == "Fuerza prensión":
             st.write(f"**Referencia P50:** {p50_texto}")
             st.write(f"**Interpretación clínica:** {interpretar_clinicamente(p_est, prueba)}")
 
+            if st.button("Guardar evaluación", key="guardar_prension"):
+                if paciente.strip() == "":
+                    st.error("Debés completar el nombre del paciente antes de guardar.")
+                else:
+                    guardar_evaluacion(
+                        paciente=paciente.strip(),
+                        sexo=sexo,
+                        edad=edad,
+                        prueba=prueba,
+                        valor_medido=valor_medido,
+                        percentil=p_est,
+                        clasificacion=clasificacion
+                    )
+                    st.success("Evaluación guardada correctamente.")
+
 elif prueba == "Levantarse de silla":
     df, cols = cargar_silla()
 
-    sexo_ui = st.selectbox("Sexo", ["Hombre", "Mujer"])
-    sexo = formatear_sexo_ui(sexo_ui)
+    sexo = sexo_global
     edad = st.number_input("Edad", min_value=65, max_value=110, value=70, step=1)
-    repeticiones = st.number_input("Repeticiones realizadas", min_value=0.0, value=11.0, step=1.0)
+    valor_medido = st.number_input("Repeticiones realizadas", min_value=0.0, value=11.0, step=1.0)
 
     grupo = edad_a_grupo_silla(edad)
 
@@ -400,7 +462,8 @@ elif prueba == "Levantarse de silla":
             p50 = ref.loc[ref[cols["percentil"]] == 50, cols["resultado"]]
             p50_texto = f"{float(p50.iloc[0]):.0f}" if not p50.empty else "No disponible"
 
-            p_est, texto_p, rango_p = estimar_percentil(repeticiones, ref, cols["resultado"], cols["percentil"])
+            p_est, texto_p, rango_p = estimar_percentil(valor_medido, ref, cols["resultado"], cols["percentil"])
+            clasificacion = obtener_etiqueta_semaforo(p_est)
 
             mostrar_semaforo(p_est)
             st.success(texto_p)
@@ -410,4 +473,17 @@ elif prueba == "Levantarse de silla":
             st.write(f"**Referencia P50:** {p50_texto} repeticiones")
             st.write(f"**Interpretación clínica:** {interpretar_clinicamente(p_est, prueba)}")
 
-
+            if st.button("Guardar evaluación", key="guardar_silla"):
+                if paciente.strip() == "":
+                    st.error("Debés completar el nombre del paciente antes de guardar.")
+                else:
+                    guardar_evaluacion(
+                        paciente=paciente.strip(),
+                        sexo=sexo,
+                        edad=edad,
+                        prueba=prueba,
+                        valor_medido=valor_medido,
+                        percentil=p_est,
+                        clasificacion=clasificacion
+                    )
+                    st.success("Evaluación guardada correctamente.")
