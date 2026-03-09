@@ -11,13 +11,10 @@ scope = [
     "https://www.googleapis.com/auth/drive"
 ]
 
-service_account_info = json.loads(st.secrets["gcp_service_account_json"])
-
 credentials = Credentials.from_service_account_info(
-    service_account_info,
+    st.secrets["gcp_service_account"],
     scopes=scope
 )
-
 client = gspread.authorize(credentials)
 sheet = client.open("Evaluaciones_Funcionales").sheet1
 
@@ -490,4 +487,5 @@ elif prueba == "Levantarse de silla":
                         clasificacion=clasificacion
                     )
                     st.success("Evaluación guardada correctamente.")
+
 
