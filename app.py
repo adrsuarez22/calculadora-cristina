@@ -4,490 +4,391 @@ import unicodedata
 from datetime import datetime
 from supabase import create_client, Client
 
+# =========================================================
+# CONFIG
+# =========================================================
+st.set_page_config(
+    page_title="Calculadora de Condición Física",
+    page_icon="💪",
+    layout="centered"
+)
+
+# =========================================================
+# SUPABASE
+# =========================================================
 SUPABASE_URL = st.secrets["SUPABASE_URL"]
 SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-st.set_page_config(page_title="Calculadora de Condición Física", layout="centered")
+# =========================================================
+# UTILIDADES
+# =========================================================
+def normalizar_texto(texto):
+    texto = str(texto).strip().lower()
+    texto = unicodedata.normalize("NFKD", texto)
+    texto = texto.encode("ascii", "ignore").decode("utf-8")
+    texto = texto.replace("(", "").replace(")", "")
+    texto = texto.replace("%", "")
+    return texto
 
 
 def guardar_evaluacion(paciente, sexo, edad, prueba, valor_medido, percentil, clasificacion):
     payload = {
         "fecha": datetime.now().strftime("%Y-%m-%d"),
-        "paciente": paciente,
-        "sexo": sexo,
+        "paciente": str(paciente).strip(),
+        "sexo": str(sexo).strip().lower(),
         "edad": int(edad),
-        "prueba": prueba,
+        "prueba": str(prueba).strip(),
         "valor_medido": float(valor_medido),
         "percentilo": round(float(percentil), 1) if percentil is not None else None,
-        "clasificacion": clasificacion
+        "clasificacion": str(clasificacion).strip()
     }
 
     respuesta = supabase.table("evaluaciones").insert(payload).execute()
     return respuesta
 
 
-# =========================
-# Utilidades generales
-# =========================
-def normalizar_texto(texto):
-    texto = str(texto).strip().lower()
-    texto = unicodedata.normalize("NFKD", texto).encode("ascii", "ignore").decode("ascii")
-    texto = texto.replace("(", "").replace(")", "")
-    texto = texto.replace("%", "")
-    texto = texto.replace(".", "").replace(",", "")
-    texto = texto.replace("-", "_").replace("/", "_")
-    texto = "_".join(texto.split())
-    return texto
-
-
-def normalizar_columnas(df):
-    df = df.copy()
-    df.columns = [normalizar_texto(c) for c in df.columns]
-    return df
-
-
-def buscar_columna(df, candidatos, fallback_index=None, obligatoria=True):
-    columnas = list(df.columns)
-    columnas_set = set(columnas)
-
-    for c in candidatos:
-        c_norm = normalizar_texto(c)
-        if c_norm in columnas_set:
-            return c_norm
-
-    if fallback_index is not None and len(columnas) > fallback_index:
-        return columnas[fallback_index]
-
-    if obligatoria:
-        raise ValueError(
-            f"No se encontró ninguna de estas columnas: {candidatos}. "
-            f"Columnas disponibles: {columnas}"
+def obtener_historial_paciente(paciente):
+    try:
+        respuesta = (
+            supabase.table("evaluaciones")
+            .select("*")
+            .eq("paciente", str(paciente).strip())
+            .order("fecha")
+            .execute()
         )
-    return None
+
+        if respuesta.data:
+            return pd.DataFrame(respuesta.data)
+
+        return pd.DataFrame()
+
+    except Exception as e:
+        st.error(f"Error al leer historial: {e}")
+        return pd.DataFrame()
 
 
-def convertir_numerico(df, columnas):
-    for c in columnas:
-        if c in df.columns:
-            df[c] = pd.to_numeric(df[c], errors="coerce")
-    return df
+def obtener_pacientes_existentes():
+    try:
+        respuesta = supabase.table("evaluaciones").select("paciente").execute()
+
+        if not respuesta.data:
+            return []
+
+        df = pd.DataFrame(respuesta.data)
+
+        if "paciente" not in df.columns:
+            return []
+
+        pacientes = (
+            df["paciente"]
+            .dropna()
+            .astype(str)
+            .str.strip()
+            .replace("", pd.NA)
+            .dropna()
+            .drop_duplicates()
+            .sort_values()
+            .tolist()
+        )
+
+        return pacientes
+
+    except Exception:
+        return []
 
 
-def normalizar_sexo_serie(serie):
-    return (
-        serie.astype(str)
-        .str.strip()
-        .str.lower()
-        .replace({
-            "hombres": "hombre",
-            "mujeres": "mujer",
-            "male": "hombre",
-            "female": "mujer",
-            "m": "hombre",
-            "f": "mujer"
-        })
-    )
-
-
-def formatear_sexo_ui(valor):
-    v = str(valor).strip().lower()
-    if v == "hombre":
-        return "hombre"
-    if v == "mujer":
-        return "mujer"
-    return v
-
-
-def edad_a_grupo_silla(edad):
-    if 65 <= edad <= 69:
-        return "AG1"
-    elif 70 <= edad <= 74:
-        return "AG2"
-    elif 75 <= edad <= 79:
-        return "AG3"
-    elif 80 <= edad <= 84:
-        return "AG4"
-    elif edad >= 85:
-        return "AG5"
-    return None
-
-
-def parsear_rango_edad(texto):
-    t = str(texto).strip().replace(" ", "")
-    if "-" in t:
-        partes = t.split("-")
-        try:
-            return int(partes[0]), int(partes[1])
-        except:
-            return None
-    if t.startswith("+"):
-        try:
-            inicio = int(t[1:])
-            return inicio, 999
-        except:
-            return None
-    return None
-
-
-def buscar_rango_edad_prension(edad, rangos_disponibles):
-    for r in rangos_disponibles:
-        parsed = parsear_rango_edad(r)
-        if parsed is None:
-            continue
-        desde, hasta = parsed
-        if desde <= edad <= hasta:
-            return r
-    return None
-
-
-def formatear_percentil(p):
-    if p is None:
-        return "N/D"
-    if float(p).is_integer():
-        return str(int(p))
-    return f"{p:.1f}"
-
-
-def obtener_color_percentil(p):
-    if p is None:
-        return "#9E9E9E"
-    if p < 10:
-        return "#D32F2F"
-    elif p < 25:
-        return "#F57C00"
-    elif p <= 75:
-        return "#388E3C"
-    else:
-        return "#1976D2"
-
-
-def obtener_etiqueta_semaforo(p):
-    if p is None:
-        return "Sin clasificación"
-    if p < 10:
+def clasificar_percentil(percentil):
+    if percentil is None:
+        return "Sin clasificar"
+    if percentil < 10:
         return "Muy bajo"
-    elif p < 25:
+    if percentil < 25:
         return "Bajo"
-    elif p <= 75:
+    if percentil < 50:
+        return "Ligeramente bajo"
+    if percentil < 75:
         return "Normal"
-    else:
-        return "Alto"
-
-def interpretar_clinicamente(p, prueba):
-    if p is None:
-        return "No se pudo estimar el percentil."
-
-    if prueba == "Caminata 6 minutos":
-        if p < 10:
-            return "Capacidad aeróbica muy disminuida para su referencia. Conviene seguimiento clínico y plan de intervención."
-        elif p < 25:
-            return "Capacidad aeróbica por debajo de lo esperado. Sugiere margen claro de mejora funcional."
-        elif p <= 75:
-            return "Capacidad aeróbica dentro del rango funcional esperado."
-        else:
-            return "Capacidad aeróbica por encima de lo esperado para su referencia."
-
-    if prueba == "Fuerza prensión":
-        if p < 10:
-            return "Fuerza de prensión muy baja para su referencia. Puede sugerir fragilidad o pérdida de fuerza significativa."
-        elif p < 25:
-            return "Fuerza de prensión baja. Conviene seguimiento y trabajo específico de fuerza."
-        elif p <= 75:
-            return "Fuerza de prensión dentro del rango esperado."
-        else:
-            return "Fuerza de prensión por encima de la media para su referencia."
-
-    if prueba == "Levantarse de silla":
-        if p < 10:
-            return "Rendimiento funcional muy bajo en miembros inferiores. Sugiere menor fuerza funcional y necesidad de intervención."
-        elif p < 25:
-            return "Rendimiento bajo para su referencia. Conviene seguimiento y entrenamiento funcional."
-        elif p <= 75:
-            return "Rendimiento funcional dentro del rango esperado."
-        else:
-            return "Rendimiento funcional por encima de lo esperado."
-
-    return "Interpretación no disponible."
+    if percentil < 90:
+        return "Bueno"
+    return "Muy bueno"
 
 
-def estimar_percentil(valor_medido, df_ref, col_valor, col_percentil):
-    ref = df_ref[[col_valor, col_percentil]].dropna().copy()
-    ref = ref.sort_values(by=col_valor).drop_duplicates(subset=[col_valor, col_percentil])
+def color_clasificacion(clasificacion):
+    mapa = {
+        "Muy bajo": "#d32f2f",
+        "Bajo": "#f57c00",
+        "Ligeramente bajo": "#fbc02d",
+        "Normal": "#388e3c",
+        "Bueno": "#1976d2",
+        "Muy bueno": "#00796b",
+        "Sin clasificar": "#757575"
+    }
+    return mapa.get(clasificacion, "#757575")
 
-    if ref.empty:
-        return None, "Sin datos de referencia.", None
 
-    valores = ref[col_valor].tolist()
-    percentiles = ref[col_percentil].tolist()
+def rango_percentilar(percentil):
+    if percentil is None:
+        return "Sin rango"
+    if percentil < 3:
+        return "Menor a P3"
+    if percentil < 10:
+        return "Entre P3 y P10"
+    if percentil < 25:
+        return "Entre P10 y P25"
+    if percentil < 50:
+        return "Entre P25 y P50"
+    if percentil < 75:
+        return "Entre P50 y P75"
+    if percentil < 90:
+        return "Entre P75 y P90"
+    if percentil < 97:
+        return "Entre P90 y P97"
+    return "Mayor a P97"
 
-    exactos = ref[ref[col_valor] == valor_medido]
-    if not exactos.empty:
-        p = float(exactos.iloc[0][col_percentil])
-        return p, f"Percentil exacto: P{formatear_percentil(p)}", f"P{formatear_percentil(p)}"
 
-    if valor_medido < min(valores):
-        p = float(percentiles[0])
-        return p, "Por debajo del percentil mínimo disponible.", f"< P{formatear_percentil(p)}"
+def interpretacion_clinica(clasificacion):
+    mapa = {
+        "Muy bajo": "Capacidad aeróbica marcadamente por debajo del rango funcional esperado.",
+        "Bajo": "Capacidad aeróbica por debajo del rango funcional esperado.",
+        "Ligeramente bajo": "Capacidad aeróbica levemente inferior al rango esperado.",
+        "Normal": "Capacidad aeróbica dentro del rango funcional esperado.",
+        "Bueno": "Capacidad aeróbica superior al promedio esperado.",
+        "Muy bueno": "Capacidad aeróbica claramente superior al rango esperado."
+    }
+    return mapa.get(clasificacion, "Sin interpretación disponible.")
 
-    if valor_medido > max(valores):
-        p = float(percentiles[-1])
-        return p, "Por encima del percentil máximo disponible.", f"> P{formatear_percentil(p)}"
 
-    for i in range(len(ref) - 1):
-        v1 = float(ref.iloc[i][col_valor])
-        v2 = float(ref.iloc[i + 1][col_valor])
-        p1 = float(ref.iloc[i][col_percentil])
-        p2 = float(ref.iloc[i + 1][col_percentil])
+# =========================================================
+# CALCULO CAMINATA 6 MINUTOS
+# Basado en la tabla que compartiste
+# =========================================================
+def calcular_resultado(prueba, sexo, edad, altura, valor_medido):
 
-        if v1 <= valor_medido <= v2:
+    if prueba != "Caminata 6 minutos":
+        return None, "Sin clasificar", "-"
+
+    tabla = {
+        150: {
+            40: {2.5: 436, 10: 470, 25: 511, 50: 555, 75: 592, 90: 631, 97.5: 679},
+            50: {2.5: 434, 10: 468, 25: 509, 50: 553, 75: 590, 90: 629, 97.5: 677},
+            60: {2.5: 414, 10: 448, 25: 489, 50: 533, 75: 570, 90: 609, 97.5: 656},
+            70: {2.5: 364, 10: 397, 25: 439, 50: 483, 75: 520, 90: 558, 97.5: 606},
+            80: {2.5: 313, 10: 347, 25: 388, 50: 432, 75: 469, 90: 508, 97.5: 556},
+        },
+        160: {
+            40: {2.5: 455, 10: 489, 25: 530, 50: 574, 75: 611, 90: 650, 97.5: 697},
+            50: {2.5: 453, 10: 487, 25: 528, 50: 572, 75: 609, 90: 648, 97.5: 695},
+            60: {2.5: 433, 10: 466, 25: 508, 50: 552, 75: 588, 90: 627, 97.5: 675},
+            70: {2.5: 382, 10: 416, 25: 457, 50: 501, 75: 538, 90: 577, 97.5: 625},
+            80: {2.5: 332, 10: 366, 25: 407, 50: 451, 75: 488, 90: 526, 97.5: 574},
+        },
+        170: {
+            40: {2.5: 474, 10: 507, 25: 549, 50: 593, 75: 629, 90: 668, 97.5: 716},
+            50: {2.5: 472, 10: 505, 25: 546, 50: 590, 75: 627, 90: 666, 97.5: 714},
+            60: {2.5: 451, 10: 485, 25: 526, 50: 570, 75: 607, 90: 646, 97.5: 694},
+            70: {2.5: 401, 10: 435, 25: 476, 50: 520, 75: 557, 90: 595, 97.5: 643},
+            80: {2.5: 351, 10: 384, 25: 425, 50: 469, 75: 506, 90: 545, 97.5: 593},
+        },
+        180: {
+            40: {2.5: 492, 10: 526, 25: 567, 50: 611, 75: 648, 90: 687, 97.5: 735},
+            50: {2.5: 490, 10: 524, 25: 565, 50: 609, 75: 646, 90: 685, 97.5: 733},
+            60: {2.5: 470, 10: 503, 25: 545, 50: 589, 75: 626, 90: 664, 97.5: 712},
+            70: {2.5: 419, 10: 453, 25: 494, 50: 538, 75: 575, 90: 614, 97.5: 662},
+            80: {2.5: 369, 10: 403, 25: 444, 50: 488, 75: 525, 90: 564, 97.5: 611},
+        },
+        190: {
+            40: {2.5: 511, 10: 544, 25: 586, 50: 630, 75: 667, 90: 705, 97.5: 753},
+            50: {2.5: 509, 10: 542, 25: 584, 50: 628, 75: 665, 90: 703, 97.5: 751},
+            60: {2.5: 488, 10: 522, 25: 563, 50: 607, 75: 644, 90: 683, 97.5: 731},
+            70: {2.5: 438, 10: 472, 25: 513, 50: 557, 75: 594, 90: 633, 97.5: 680},
+            80: {2.5: 388, 10: 421, 25: 463, 50: 507, 75: 544, 90: 582, 97.5: 630},
+        }
+    }
+
+    altura = int(altura)
+    edad = int(edad)
+    distancia = float(valor_medido)
+
+    altura_ref = min(tabla.keys(), key=lambda x: abs(x - altura))
+    edad_ref = min(tabla[altura_ref].keys(), key=lambda x: abs(x - edad))
+
+    percentiles = tabla[altura_ref][edad_ref]
+    percentiles_ordenados = sorted(percentiles.items(), key=lambda x: x[1])
+
+    percentil_estimado = None
+
+    for i in range(len(percentiles_ordenados) - 1):
+        p1, v1 = percentiles_ordenados[i]
+        p2, v2 = percentiles_ordenados[i + 1]
+
+        if v1 <= distancia <= v2:
             if v2 == v1:
-                p_est = p1
+                percentil_estimado = p1
             else:
-                p_est = p1 + ((valor_medido - v1) / (v2 - v1)) * (p2 - p1)
+                percentil_estimado = p1 + (distancia - v1) * (p2 - p1) / (v2 - v1)
+            break
 
-            texto = f"Percentil estimado: P{p_est:.1f}"
-            rango = f"Entre P{formatear_percentil(p1)} y P{formatear_percentil(p2)}"
-            return p_est, texto, rango
+    if distancia < percentiles_ordenados[0][1]:
+        percentil_estimado = percentiles_ordenados[0][0]
 
-    return None, "No se pudo estimar el percentil.", None
+    if distancia > percentiles_ordenados[-1][1]:
+        percentil_estimado = percentiles_ordenados[-1][0]
 
+    if percentil_estimado is None:
+        return None, "Sin clasificar", "-"
 
-def mostrar_semaforo(p):
-    color = obtener_color_percentil(p)
-    etiqueta = obtener_etiqueta_semaforo(p)
+    percentil_estimado = round(percentil_estimado, 1)
+    clasificacion = clasificar_percentil(percentil_estimado)
+    referencia_p50 = percentiles[50]
 
-    st.markdown(
-        f"""
-        <div style="
-            background-color:{color};
-            color:white;
-            padding:14px 18px;
-            border-radius:10px;
-            font-weight:700;
-            margin-top:8px;
-            margin-bottom:12px;
-            text-align:center;
-            font-size:18px;">
-            {etiqueta}
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+    return percentil_estimado, clasificacion, f"{referencia_p50} m"
 
 
-# =========================
-# Carga de datos
-# =========================
-@st.cache_data
-def cargar_caminata():
-    df = pd.read_csv("caminata_6min_long.csv")
-    df = normalizar_columnas(df)
-
-    col_altura = buscar_columna(df, ["altura_cm", "altura", "talla", "height"], fallback_index=0)
-    col_edad = buscar_columna(df, ["edad_anos", "edad", "anos", "age"], fallback_index=1)
-    col_percentil = buscar_columna(df, ["percentil", "percentil_ref", "p"], fallback_index=2)
-    col_resultado = buscar_columna(df, ["distancia_m", "distancia", "metros", "resultado"], fallback_index=3)
-
-    df = convertir_numerico(df, [col_altura, col_edad, col_percentil, col_resultado])
-    df = df.dropna(subset=[col_altura, col_edad, col_percentil, col_resultado])
-
-    return df, {"altura": col_altura, "edad": col_edad, "percentil": col_percentil, "resultado": col_resultado}
-
-
-@st.cache_data
-def cargar_prension():
-    df = pd.read_csv("prension_manual_long.csv")
-    df = normalizar_columnas(df)
-
-    col_sexo = buscar_columna(df, ["sexo", "genero", "sex"], fallback_index=0)
-    col_edad = buscar_columna(df, ["edad_rango", "edad", "edad_anos", "anos", "age"], fallback_index=1)
-    col_percentil = buscar_columna(df, ["percentil", "percentil_ref", "p"], fallback_index=2)
-    col_resultado = buscar_columna(df, ["fuerza_kg", "fuerza", "kg", "prension", "prension_kg"], fallback_index=3)
-
-    df[col_sexo] = normalizar_sexo_serie(df[col_sexo])
-    df[col_edad] = df[col_edad].astype(str).str.strip()
-    df = convertir_numerico(df, [col_percentil, col_resultado])
-    df = df.dropna(subset=[col_percentil, col_resultado])
-
-    return df, {"sexo": col_sexo, "edad": col_edad, "percentil": col_percentil, "resultado": col_resultado}
-
-
-@st.cache_data
-def cargar_silla():
-    df = pd.read_csv("silla_long.csv")
-    df = normalizar_columnas(df)
-
-    col_sexo = buscar_columna(df, ["sexo", "genero", "sex"], fallback_index=0)
-    col_grupo = buscar_columna(df, ["grupo_edad", "grupoedad", "grupo", "ag"], fallback_index=1)
-    col_percentil = buscar_columna(df, ["percentil", "percentil_ref", "p"], fallback_index=4)
-    col_resultado = buscar_columna(df, ["valor_repeticiones", "repeticiones", "resultado", "levantadas"], fallback_index=5)
-
-    df[col_sexo] = normalizar_sexo_serie(df[col_sexo])
-    df[col_grupo] = df[col_grupo].astype(str).str.strip().str.upper()
-    df = convertir_numerico(df, [col_percentil, col_resultado])
-    df = df.dropna(subset=[col_percentil, col_resultado])
-
-    return df, {"sexo": col_sexo, "grupo": col_grupo, "percentil": col_percentil, "resultado": col_resultado}
-
-
-# =========================
-# Interfaz
-# =========================
+# =========================================================
+# UI
+# =========================================================
 st.title("Calculadora de Condición Física")
 
-paciente = st.text_input("Paciente")
-sexo_ui_global = st.selectbox("Sexo", ["Hombre", "Mujer"])
-sexo_global = formatear_sexo_ui(sexo_ui_global)
+pacientes_existentes = obtener_pacientes_existentes()
+opciones_paciente = [""] + pacientes_existentes + ["Otro / escribir nuevo"]
 
-prueba = st.selectbox(
-    "Seleccionar prueba",
-    ["Caminata 6 minutos", "Fuerza prensión", "Levantarse de silla"]
+paciente_opcion = st.selectbox("Paciente", options=opciones_paciente, index=0)
+
+if paciente_opcion == "Otro / escribir nuevo":
+    paciente = st.text_input("Nombre del paciente")
+else:
+    paciente = paciente_opcion
+
+sexo = st.selectbox("Sexo", ["Hombre", "Mujer"])
+prueba = st.selectbox("Seleccionar prueba", ["Caminata 6 minutos"])
+edad = st.selectbox("Edad", list(range(40, 81)), index=20)
+altura = st.selectbox("Altura (cm)", [150, 160, 170, 180, 190], index=2)
+
+distancia = st.number_input(
+    "Distancia caminada (metros)",
+    min_value=0.0,
+    max_value=2000.0,
+    value=600.0,
+    step=1.0,
+    format="%.2f"
 )
 
-if prueba == "Caminata 6 minutos":
-    df, cols = cargar_caminata()
+valor_medido = distancia
 
-    edades = sorted(df[cols["edad"]].dropna().astype(int).unique().tolist())
-    alturas = sorted(df[cols["altura"]].dropna().astype(int).unique().tolist())
+percentil, clasificacion, referencia_p50 = calcular_resultado(
+    prueba=prueba,
+    sexo=sexo,
+    edad=edad,
+    altura=altura,
+    valor_medido=valor_medido
+)
 
-    edad = st.selectbox("Edad", edades)
-    altura = st.selectbox("Altura (cm)", alturas)
-    valor_medido = st.number_input("Distancia caminada (metros)", min_value=0.0, value=451.0, step=1.0)
+# =========================================================
+# RESULTADO
+# =========================================================
+color = color_clasificacion(clasificacion)
 
-    ref = df[(df[cols["edad"]] == edad) & (df[cols["altura"]] == altura)].copy()
+st.markdown(
+    f"""
+    <div style="
+        background-color:{color};
+        color:white;
+        padding:16px;
+        border-radius:10px;
+        text-align:center;
+        font-size:28px;
+        font-weight:700;
+        margin-top:20px;
+        margin-bottom:15px;
+    ">
+        {clasificacion}
+    </div>
+    """,
+    unsafe_allow_html=True
+)
 
-    if ref.empty:
-        st.warning("No hay datos de referencia para esa combinación.")
+st.markdown(
+    f"""
+    <div style="
+        background-color:#dff0e6;
+        color:#1b5e20;
+        padding:14px;
+        border-radius:10px;
+        font-size:22px;
+        margin-bottom:20px;
+    ">
+        Percentil estimado: <b>P{percentil if percentil is not None else "-"}</b>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
+st.write(f"**Rango percentilar:** {rango_percentilar(percentil)}")
+st.write(f"**Referencia P50:** {referencia_p50}")
+st.write(f"**Interpretación clínica:** {interpretacion_clinica(clasificacion)}")
+
+# =========================================================
+# GUARDADO
+# =========================================================
+if st.button("Guardar evaluación"):
+    if not paciente or str(paciente).strip() == "":
+        st.warning("Ingresá el nombre del paciente antes de guardar.")
+    elif percentil is None:
+        st.warning("No se pudo calcular el percentil.")
     else:
-        p50 = ref.loc[ref[cols["percentil"]] == 50, cols["resultado"]]
-        p50_texto = f"{float(p50.iloc[0]):.0f} m" if not p50.empty else "No disponible"
+        try:
+            guardar_evaluacion(
+                paciente=paciente,
+                sexo=sexo,
+                edad=edad,
+                prueba=prueba,
+                valor_medido=valor_medido,
+                percentil=percentil,
+                clasificacion=clasificacion
+            )
+            st.success("Evaluación guardada correctamente.")
+            st.rerun()
+        except Exception as e:
+            st.error(f"Error al guardar: {e}")
 
-        p_est, texto_p, rango_p = estimar_percentil(valor_medido, ref, cols["resultado"], cols["percentil"])
-        clasificacion = obtener_etiqueta_semaforo(p_est)
+# =========================================================
+# HISTORIAL
+# =========================================================
+if paciente and str(paciente).strip() != "":
+    st.markdown("### Historial del paciente")
 
-        mostrar_semaforo(p_est)
-        st.success(texto_p)
-        if rango_p:
-            st.write(f"**Rango percentilar:** {rango_p}")
-        st.write(f"**Referencia P50:** {p50_texto}")
-        st.write(f"**Interpretación clínica:** {interpretar_clinicamente(p_est, prueba)}")
+    df_historial = obtener_historial_paciente(paciente)
 
-        if st.button("Guardar evaluación", key="guardar_caminata"):
-            if paciente.strip() == "":
-                st.error("Debés completar el nombre del paciente antes de guardar.")
-            else:
-                try:
-                    guardar_evaluacion(
-                        paciente=paciente.strip(),
-                        sexo=sexo_global,
-                        edad=edad,
-                        prueba=prueba,
-                        valor_medido=valor_medido,
-                        percentil=p_est,
-                        clasificacion=clasificacion
-                    )
-                    st.success("Evaluación guardada correctamente.")
-                except Exception as e:
-                    st.error(f"Error al guardar: {e}")
+    if not df_historial.empty:
+        columnas_mostrar = ["fecha", "prueba", "valor_medido", "percentilo", "clasificacion"]
+        columnas_existentes = [c for c in columnas_mostrar if c in df_historial.columns]
+        df_historial_mostrar = df_historial[columnas_existentes].copy()
 
-elif prueba == "Fuerza prensión":
-    df, cols = cargar_prension()
+        if "fecha" in df_historial_mostrar.columns:
+            df_historial_mostrar["fecha"] = pd.to_datetime(
+                df_historial_mostrar["fecha"],
+                errors="coerce"
+            ).dt.strftime("%Y-%m-%d")
 
-    sexo = sexo_global
-    edad = st.number_input("Edad", min_value=20, max_value=110, value=60, step=1)
-    valor_medido = st.number_input("Fuerza medida (kg)", min_value=0.0, value=25.0, step=0.1)
+        st.dataframe(
+            df_historial_mostrar,
+            use_container_width=True,
+            hide_index=True
+        )
 
-    rangos = sorted(df[cols["edad"]].dropna().astype(str).unique().tolist())
-    rango_edad = buscar_rango_edad_prension(edad, rangos)
+        if "fecha" in df_historial.columns and "percentilo" in df_historial.columns:
+            df_graf = df_historial.copy()
+            df_graf["fecha"] = pd.to_datetime(df_graf["fecha"], errors="coerce")
+            df_graf["percentilo"] = pd.to_numeric(df_graf["percentilo"], errors="coerce")
+            df_graf = df_graf.dropna(subset=["fecha", "percentilo"]).sort_values("fecha")
 
-    if rango_edad is None:
-        st.warning("No hay un rango de edad válido para esa edad.")
+            if not df_graf.empty:
+                st.markdown("### Evolución del percentil")
+                st.line_chart(
+                    df_graf.set_index("fecha")["percentilo"],
+                    use_container_width=True
+                )
     else:
-        ref = df[(df[cols["sexo"]] == sexo) & (df[cols["edad"]].astype(str) == str(rango_edad))].copy()
-
-        if ref.empty:
-            st.warning("No hay datos de referencia para esa combinación.")
-        else:
-            p50 = ref.loc[ref[cols["percentil"]] == 50, cols["resultado"]]
-            p50_texto = f"{float(p50.iloc[0]):.1f} kg" if not p50.empty else "No disponible"
-
-            p_est, texto_p, rango_p = estimar_percentil(valor_medido, ref, cols["resultado"], cols["percentil"])
-            clasificacion = obtener_etiqueta_semaforo(p_est)
-
-            mostrar_semaforo(p_est)
-            st.success(texto_p)
-            if rango_p:
-                st.write(f"**Rango percentilar:** {rango_p}")
-            st.write(f"**Rango de edad utilizado:** {rango_edad}")
-            st.write(f"**Referencia P50:** {p50_texto}")
-            st.write(f"**Interpretación clínica:** {interpretar_clinicamente(p_est, prueba)}")
-
-            if st.button("Guardar evaluación", key="guardar_prension"):
-                if paciente.strip() == "":
-                    st.error("Debés completar el nombre del paciente antes de guardar.")
-                else:
-                    try:
-                        guardar_evaluacion(
-                            paciente=paciente.strip(),
-                            sexo=sexo,
-                            edad=edad,
-                            prueba=prueba,
-                            valor_medido=valor_medido,
-                            percentil=p_est,
-                            clasificacion=clasificacion
-                        )
-                        st.success("Evaluación guardada correctamente.")
-                    except Exception as e:
-                        st.error(f"Error al guardar: {e}")
-
-elif prueba == "Levantarse de silla":
-    df, cols = cargar_silla()
-
-    sexo = sexo_global
-    edad = st.number_input("Edad", min_value=65, max_value=110, value=70, step=1)
-    valor_medido = st.number_input("Repeticiones realizadas", min_value=0.0, value=11.0, step=1.0)
-
-    grupo = edad_a_grupo_silla(edad)
-
-    if grupo is None:
-        st.warning("No hay grupo etario válido para esa edad.")
-    else:
-        ref = df[(df[cols["sexo"]] == sexo) & (df[cols["grupo"]] == grupo)].copy()
-
-        if ref.empty:
-            st.warning("No hay datos de referencia para esa combinación.")
-        else:
-            p50 = ref.loc[ref[cols["percentil"]] == 50, cols["resultado"]]
-            p50_texto = f"{float(p50.iloc[0]):.0f}" if not p50.empty else "No disponible"
-
-            p_est, texto_p, rango_p = estimar_percentil(valor_medido, ref, cols["resultado"], cols["percentil"])
-            clasificacion = obtener_etiqueta_semaforo(p_est)
-
-            mostrar_semaforo(p_est)
-            st.success(texto_p)
-            if rango_p:
-                st.write(f"**Rango percentilar:** {rango_p}")
-            st.write(f"**Grupo de edad utilizado:** {grupo}")
-            st.write(f"**Referencia P50:** {p50_texto} repeticiones")
-            st.write(f"**Interpretación clínica:** {interpretar_clinicamente(p_est, prueba)}")
-
-            if st.button("Guardar evaluación", key="guardar_silla"):
-                if paciente.strip() == "":
-                    st.error("Debés completar el nombre del paciente antes de guardar.")
-                else:
-                    try:
-                        guardar_evaluacion(
-                            paciente=paciente.strip(),
-                            sexo=sexo,
-                            edad=edad,
-                            prueba=prueba,
-                            valor_medido=valor_medido,
-                            percentil=p_est,
-                            clasificacion=clasificacion
-                        )
-                        st.success("Evaluación guardada correctamente.")
-                    except Exception as e:
-                        st.error(f"Error al guardar: {e}")
-
+        st.info("Todavía no hay evaluaciones guardadas para este paciente.")
