@@ -1,27 +1,32 @@
 import streamlit as st
 import pandas as pd
 import unicodedata
-import gspread
-from google.oauth2.service_account import Credentials
 from datetime import datetime
+from supabase import create_client, Client
 
-scope = [
-    "https://www.googleapis.com/auth/spreadsheets",
-    "https://www.googleapis.com/auth/drive"
-]
+SUPABASE_URL = st.secrets["SUPABASE_URL"]
+SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
 
-service_account_info = dict(st.secrets["gcp_service_account"])
-
-credentials = Credentials.from_service_account_info(
-    service_account_info,
-    scopes=scope
-)
-
-client = gspread.authorize(credentials)
-sheet = client.open("Evaluaciones_Funcionales").sheet1
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 st.set_page_config(page_title="Calculadora de Condición Física", layout="centered")
 
+
+def guardar_evaluacion(paciente, sexo, edad, prueba, valor_medido, percentil, clasificacion):
+    payload = {
+        "fecha": datetime.now().strftime("%Y-%m-%d"),
+        "paciente": paciente,
+        "sexo": sexo,
+        "edad": int(edad),
+        "prueba": prueba,
+        "valor_medido": float(valor_medido),
+        "percentilo": round(float(percentil), 1) if percentil is not None else None,
+        "clasificacion": clasificacion
+    }
+
+    respuesta = supabase.table("evaluaciones").insert(payload).execute()
+    return respuesta
+    
 scope = [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive"
@@ -503,6 +508,7 @@ elif prueba == "Levantarse de silla":
                         clasificacion=clasificacion
                     )
                     st.success("Evaluación guardada correctamente.")
+
 
 
 
