@@ -572,8 +572,8 @@ if paciente:
                     st.markdown(f"### Evolución del percentil - {prueba_graf}")
 
                     linea = alt.Chart(df_prueba).mark_line(point=False).encode(
-                        x=alt.X("yearmonthdate(fecha):T", title="Fecha"),
-                        y=alt.Y("percentil:Q", title="Percentil")
+                    x=alt.X("yearmonthdate(fecha):T", title="Fecha", axis=alt.Axis(format="%d-%m-%Y")),
+                    y=alt.Y("percentil:Q", title="Percentil")
                     )
 
                     puntos = alt.Chart(df_prueba).mark_circle(size=90).encode(
@@ -595,6 +595,7 @@ if paciente:
                     st.altair_chart(grafico, use_container_width=True)
     else:
         st.info("Todavía no hay evaluaciones guardadas para este paciente.")
+
 
 
 
