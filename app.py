@@ -487,10 +487,14 @@ st.title("Calculadora de Condición Física")
 st.markdown("""
 <style>
 div[data-testid="stMetricValue"] {
-    font-size: 1.5rem !important;
+    font-size: 1.35rem !important;
 }
 div[data-testid="stMetricLabel"] {
-    font-size: 0.85rem !important;
+    font-size: 0.80rem !important;
+}
+div[data-testid="stMetric"] {
+    padding-top: 0.2rem !important;
+    padding-bottom: 0.2rem !important;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -625,13 +629,13 @@ st.markdown(
     <div style="
         background-color:{color};
         color:white;
-        padding:12px;
-        border-radius:10px;
+        padding:10px 12px;
+        border-radius:8px;
         text-align:center;
-        font-size:20px;
+        font-size:18px;
         font-weight:600;
-        margin-top:16px;
-        margin-bottom:12px;
+        margin-top:18px;
+        margin-bottom:10px;
     ">
         {clasificacion}
     </div>
@@ -643,17 +647,16 @@ st.markdown(
     <div style="
         background-color:#dff0e6;
         color:#1b5e20;
-        padding:10px 12px;
-        border-radius:10px;
-        font-size:16px;
-        margin-bottom:16px;
+        padding:8px 12px;
+        border-radius:8px;
+        font-size:15px;
+        margin-bottom:14px;
     ">
         Percentil estimado: <b>P{percentil if percentil is not None else "-"}</b>
     </div>
     """,
     unsafe_allow_html=True
 )
-
 st.write(f"**Rango percentilar:** {rango_percentilar(percentil)}")
 st.write(f"**Referencia P50:** {referencia_p50}")
 
@@ -848,5 +851,6 @@ if paciente_nombre:
                             st.info("Sin cambios respecto a la evaluación anterior")
     else:
         st.info("Todavía no hay evaluaciones guardadas para este paciente.")
+
 
 
