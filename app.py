@@ -209,21 +209,62 @@ def generar_pdf_historial(paciente, df):
     return buffer
 
 
-def obtener_historial_paciente(paciente):
+def obtener_ficha_paciente(paciente_nombre):
     try:
-        respuesta = (
-            supabase.table("evaluaciones")
-            .select("*")
-            .eq("paciente", str(paciente).strip())
-            .order("fecha")
+        paciente_nombre = str(paciente_nombre).strip()
+
+        respuesta_paciente = (
+            supabase.table("pacientes")
+            .select("nombre, sexo, created_at")
+            .eq("nombre", paciente_nombre)
+            .limit(1)
             .execute()
         )
-        if respuesta.data:
-            return pd.DataFrame(respuesta.data)
-        return pd.DataFrame()
+
+        datos_paciente = respuesta_paciente.data[0] if respuesta_paciente.data else {}
+
+        df_historial = obtener_historial_paciente(paciente_nombre)
+
+        cantidad_evaluaciones = 0
+        ultima_fecha = "-"
+        ultima_clasificacion = "-"
+        ultima_prueba = "-"
+
+        if not df_historial.empty:
+            if "fecha" in df_historial.columns:
+                df_historial["fecha"] = pd.to_datetime(df_historial["fecha"], errors="coerce")
+                df_historial = df_historial.sort_values("fecha", ascending=False)
+
+            cantidad_evaluaciones = len(df_historial)
+
+            if "fecha" in df_historial.columns and pd.notna(df_historial.iloc[0]["fecha"]):
+                ultima_fecha = df_historial.iloc[0]["fecha"].strftime("%d-%m-%Y")
+
+            if "clasificacion" in df_historial.columns and pd.notna(df_historial.iloc[0]["clasificacion"]):
+                ultima_clasificacion = str(df_historial.iloc[0]["clasificacion"])
+
+            if "prueba" in df_historial.columns and pd.notna(df_historial.iloc[0]["prueba"]):
+                ultima_prueba = str(df_historial.iloc[0]["prueba"])
+
+        return {
+            "nombre": datos_paciente.get("nombre", paciente_nombre),
+            "sexo": datos_paciente.get("sexo", "-"),
+            "cantidad_evaluaciones": cantidad_evaluaciones,
+            "ultima_fecha": ultima_fecha,
+            "ultima_clasificacion": ultima_clasificacion,
+            "ultima_prueba": ultima_prueba
+        }
+
     except Exception as e:
-        st.error(f"Error al leer historial: {e}")
-        return pd.DataFrame()
+        st.error(f"Error al cargar ficha del paciente: {e}")
+        return {
+            "nombre": paciente_nombre,
+            "sexo": "-",
+            "cantidad_evaluaciones": 0,
+            "ultima_fecha": "-",
+            "ultima_clasificacion": "-",
+            "ultima_prueba": "-"
+        }
 
 # =========================================================
 # CONFIG
@@ -1476,4 +1517,5 @@ if paciente_nombre:
 
     else:
         st.info("Todavía no hay evaluaciones guardadas para este paciente.")
+
 
