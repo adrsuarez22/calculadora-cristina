@@ -3,6 +3,9 @@ import pandas as pd
 import altair as alt
 from datetime import datetime
 from supabase import create_client, Client
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
+from io import BytesIO
 
 # =========================================================
 # CONFIG
@@ -136,6 +139,53 @@ def guardar_evaluacion(paciente, sexo, edad, prueba, valor_medido, percentil, cl
     }
     return supabase.table("evaluaciones").insert(payload).execute()
 
+def generar_pdf_historial(paciente, df):
+
+    buffer = BytesIO()
+    pdf = canvas.Canvas(buffer, pagesize=letter)
+
+    y = 750
+
+    pdf.setFont("Helvetica-Bold", 16)
+    pdf.drawString(50, y, "Historial de condición física")
+
+    y -= 30
+
+    pdf.setFont("Helvetica", 12)
+    pdf.drawString(50, y, f"Paciente: {paciente}")
+
+    y -= 40
+
+    pdf.setFont("Helvetica-Bold", 11)
+    pdf.drawString(50, y, "Fecha")
+    pdf.drawString(130, y, "Prueba")
+    pdf.drawString(300, y, "Valor")
+    pdf.drawString(360, y, "Percentil")
+    pdf.drawString(440, y, "Clasificación")
+
+    y -= 20
+
+    pdf.setFont("Helvetica", 10)
+
+    for _, row in df.iterrows():
+
+        pdf.drawString(50, y, str(row["fecha"]))
+        pdf.drawString(130, y, str(row["prueba"]))
+        pdf.drawString(300, y, str(row["valor_medido"]))
+        pdf.drawString(360, y, str(row["percentil"]))
+        pdf.drawString(440, y, str(row["clasificacion"]))
+
+        y -= 18
+
+        if y < 100:
+            pdf.showPage()
+            pdf.setFont("Helvetica", 10)
+            y = 750
+
+    pdf.save()
+    buffer.seek(0)
+
+    return buffer
 
 def obtener_historial_paciente(paciente):
     try:
@@ -544,14 +594,23 @@ if paciente:
             use_container_width=True,
             hide_index=True
         )
-
         csv_historial = df_historial_mostrar.to_csv(index=False).encode("utf-8")
+
         st.download_button(
-            label="Descargar historial CSV",
-            data=csv_historial,
-            file_name=f"historial_{paciente.replace(' ', '_')}.csv",
-            mime="text/csv"
+        label="Descargar historial CSV",
+        data=csv_historial,
+        file_name=f"historial_{paciente.replace(' ', '_')}.csv",
+        mime="text/csv"
         )
+
+pdf_buffer = generar_pdf_historial(paciente, df_historial_mostrar)
+
+    st.download_button(
+    label="Descargar historial PDF",
+    data=pdf_buffer,
+    file_name=f"historial_{paciente}.pdf",
+    mime="application/pdf"
+)
 
         if "fecha" in df_historial.columns and "percentil" in df_historial.columns and "prueba" in df_historial.columns:
             df_graf_base = df_historial.copy()
@@ -631,6 +690,7 @@ if paciente:
                             st.info("Sin cambios respecto a la evaluación anterior")
     else:
         st.info("Todavía no hay evaluaciones guardadas para este paciente.")
+
 
 
 
