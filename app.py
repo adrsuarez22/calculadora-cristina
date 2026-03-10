@@ -767,16 +767,28 @@ if paciente_nombre:
             key="btn_descargar_csv"
         )
 
-        pdf_df = df_historial_mostrar.drop(columns=["id"], errors="ignore").copy()
-        pdf_buffer = generar_pdf_historial(paciente_nombre, pdf_df)
+       pdf_df = df_historial_mostrar.drop(columns=["id"], errors="ignore").copy()
+pdf_buffer = generar_pdf_historial(paciente_nombre, pdf_df)
 
-        st.download_button(
-            label="Descargar historial PDF",
-            data=pdf_buffer,
-            file_name=f"historial_{paciente_nombre.replace(' ', '_')}.pdf",
-            mime="application/pdf",
-            key="btn_descargar_pdf"
-        )
+col_csv, col_pdf = st.columns(2)
+
+with col_csv:
+    st.download_button(
+        label="Descargar historial CSV",
+        data=csv_historial,
+        file_name=f"historial_{paciente_nombre.replace(' ', '_')}.csv",
+        mime="text/csv",
+        key="btn_descargar_csv"
+    )
+
+with col_pdf:
+    st.download_button(
+        label="Descargar historial PDF",
+        data=pdf_buffer,
+        file_name=f"historial_{paciente_nombre.replace(' ', '_')}.pdf",
+        mime="application/pdf",
+        key="btn_descargar_pdf"
+    )
 
         if {"fecha", "percentil", "prueba"}.issubset(df_historial.columns):
             df_graf_base = df_historial.copy()
@@ -857,3 +869,4 @@ if paciente_nombre:
                             st.info("Sin cambios respecto a la evaluación anterior")
     else:
         st.info("Todavía no hay evaluaciones guardadas para este paciente.")
+
