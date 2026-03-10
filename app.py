@@ -124,7 +124,7 @@ TABLA_SILLA = {
 }
 
 # =========================================================
-# UTILIDADES BASE DE DATOS
+# BASE DE DATOS
 # =========================================================
 def guardar_evaluacion(paciente_nombre, sexo, edad, prueba, valor_medido, percentil, clasificacion):
     payload = {
@@ -263,12 +263,10 @@ def generar_pdf_historial(paciente, df):
     pdf.drawString(50, y, "Historial de condición física")
 
     y -= 30
-
     pdf.setFont("Helvetica", 12)
     pdf.drawString(50, y, f"Paciente: {paciente}")
 
     y -= 40
-
     pdf.setFont("Helvetica-Bold", 11)
     pdf.drawString(50, y, "Fecha")
     pdf.drawString(130, y, "Prueba")
@@ -295,9 +293,7 @@ def generar_pdf_historial(paciente, df):
 
     pdf.save()
     buffer.seek(0)
-
     return buffer
-
 
 # =========================================================
 # UTILIDADES CLÍNICAS
@@ -482,7 +478,6 @@ def calcular_resultado(prueba, sexo, edad, altura, valor_medido):
 
     return None, "Sin clasificar", "-", "-", "-"
 
-
 # =========================================================
 # UI
 # =========================================================
@@ -490,11 +485,7 @@ st.title("Calculadora de Condición Física")
 
 with st.expander("➕ Nuevo paciente"):
     nuevo_nombre = st.text_input("Nombre del nuevo paciente", key="nuevo_nombre_alta")
-    nuevo_sexo = st.selectbox(
-        "Sexo del nuevo paciente",
-        ["hombre", "mujer"],
-        key="nuevo_sexo_alta"
-    )
+    nuevo_sexo = st.selectbox("Sexo del nuevo paciente", ["hombre", "mujer"], key="nuevo_sexo_alta")
 
     if st.button("Guardar paciente", key="btn_guardar_paciente"):
         if not nuevo_nombre.strip():
@@ -514,14 +505,10 @@ if not opciones_pacientes:
     st.warning("No hay pacientes cargados. Agregá uno desde '➕ Nuevo paciente'.")
     st.stop()
 
-paciente_nombre = st.selectbox(
-    "Seleccionar paciente",
-    opciones_pacientes,
-    key="selector_paciente"
-)
+paciente_nombre = st.selectbox("Seleccionar paciente", opciones_pacientes, key="selector_paciente")
 
 # =========================================================
-# FICHA DEL PACIENTE
+# FICHA
 # =========================================================
 ficha = obtener_ficha_paciente(paciente_nombre)
 
@@ -695,8 +682,6 @@ if st.button("Guardar evaluación", key="btn_guardar_evaluacion"):
 # HISTORIAL Y GRAFICOS
 # =========================================================
 if paciente_nombre:
-    st.markdown("### Historial del paciente")
-
     df_historial = obtener_historial_paciente(paciente_nombre)
 
     if not df_historial.empty:
@@ -726,6 +711,39 @@ if paciente_nombre:
 
         df_historial_mostrar = df_historial_mostrar.sort_values(by="fecha", ascending=False)
 
+        csv_historial = (
+            df_historial_mostrar
+            .drop(columns=["id"], errors="ignore")
+            .to_csv(index=False)
+            .encode("utf-8")
+        )
+
+        pdf_df = df_historial_mostrar.drop(columns=["id"], errors="ignore").copy()
+        pdf_buffer = generar_pdf_historial(paciente_nombre, pdf_df)
+
+        col_titulo, col_csv, col_pdf = st.columns([3, 1, 1])
+
+        with col_titulo:
+            st.markdown("### Historial del paciente")
+
+        with col_csv:
+            st.download_button(
+                label="CSV",
+                data=csv_historial,
+                file_name=f"historial_{paciente_nombre.replace(' ', '_')}.csv",
+                mime="text/csv",
+                key="btn_descargar_csv"
+            )
+
+        with col_pdf:
+            st.download_button(
+                label="PDF",
+                data=pdf_buffer,
+                file_name=f"historial_{paciente_nombre.replace(' ', '_')}.pdf",
+                mime="application/pdf",
+                key="btn_descargar_pdf"
+            )
+
         st.markdown("**Fecha | Prueba | Valor | Percentil | Clasificación | Eliminar**")
 
         for _, row in df_historial_mostrar.iterrows():
@@ -745,43 +763,11 @@ if paciente_nombre:
                 except Exception as e:
                     st.error(f"Error al eliminar: {e}")
 
-        csv_historial = (
-            df_historial_mostrar
-            .drop(columns=["id"], errors="ignore")
-            .to_csv(index=False)
-            .encode("utf-8")
-        )
-
-        pdf_df = df_historial_mostrar.drop(columns=["id"], errors="ignore").copy()
-        pdf_buffer = generar_pdf_historial(paciente_nombre, pdf_df)
-
-        col_csv, col_pdf = st.columns(2)
-
-        with col_csv:
-            st.download_button(
-                label="Descargar historial CSV",
-                data=csv_historial,
-                file_name=f"historial_{paciente_nombre.replace(' ', '_')}.csv",
-                mime="text/csv",
-                key="btn_descargar_csv"
-            )
-
-        with col_pdf:
-            st.download_button(
-                label="Descargar historial PDF",
-                data=pdf_buffer,
-                file_name=f"historial_{paciente_nombre.replace(' ', '_')}.pdf",
-                mime="application/pdf",
-                key="btn_descargar_pdf"
-            )
-
         if {"fecha", "percentil", "prueba"}.issubset(df_historial.columns):
             df_graf_base = df_historial.copy()
-
             df_graf_base["fecha"] = pd.to_datetime(df_graf_base["fecha"], errors="coerce").dt.date
             df_graf_base["percentil"] = pd.to_numeric(df_graf_base["percentil"], errors="coerce")
             df_graf_base["prueba"] = df_graf_base["prueba"].astype(str).str.strip()
-
             df_graf_base = df_graf_base.dropna(subset=["fecha", "percentil", "prueba"])
 
             pruebas_orden = [
@@ -804,7 +790,6 @@ if paciente_nombre:
                     )
 
                     df_prueba["Etiqueta"] = df_prueba["percentil"].apply(lambda x: f"P{round(x, 1)}")
-
                     ultimo = df_prueba["percentil"].iloc[-1]
 
                     if len(df_prueba) >= 2:
@@ -845,7 +830,6 @@ if paciente_nombre:
                     )
 
                     grafico = (linea + puntos + etiquetas).properties(height=260)
-
                     st.altair_chart(grafico, use_container_width=True)
 
                     if diferencia is not None:
@@ -856,4 +840,5 @@ if paciente_nombre:
                         else:
                             st.info("Sin cambios respecto a la evaluación anterior")
     else:
+        st.markdown("### Historial del paciente")
         st.info("Todavía no hay evaluaciones guardadas para este paciente.")
