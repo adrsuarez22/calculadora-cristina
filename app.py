@@ -571,7 +571,7 @@ if paciente:
             if prueba_filtro != "Todas":
                 pruebas_orden = [prueba_filtro]
 
-                for prueba_graf in pruebas_orden:
+            for prueba_graf in pruebas_orden:
                 df_prueba = df_graf_base[df_graf_base["prueba"] == prueba_graf].copy()
 
                 if not df_prueba.empty:
@@ -631,6 +631,7 @@ if paciente:
                             st.info("Sin cambios respecto a la evaluación anterior")
     else:
         st.info("Todavía no hay evaluaciones guardadas para este paciente.")
+
 
 
 
