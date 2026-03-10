@@ -545,7 +545,7 @@ if paciente:
         if "fecha" in df_historial.columns and "percentil" in df_historial.columns and "prueba" in df_historial.columns:
             df_graf_base = df_historial.copy()
 
-            df_graf_base["fecha"] = pd.to_datetime(df_graf_base["fecha"], errors="coerce")
+            df_graf_base["fecha"] = pd.to_datetime(df_graf_base["fecha"], errors="coerce").dt.date
             df_graf_base["percentil"] = pd.to_numeric(df_graf_base["percentil"], errors="coerce")
             df_graf_base["prueba"] = df_graf_base["prueba"].astype(str).str.strip()
 
@@ -571,27 +571,28 @@ if paciente:
 
                     st.markdown(f"### Evolución del percentil - {prueba_graf}")
 
-                    linea = alt.Chart(df_prueba).mark_line(point=False).encode(
-                        x=alt.X("fecha:T", title="Fecha"),
-                        y=alt.Y("percentil:Q", title="Percentil")
-                    )
+linea = alt.Chart(df_prueba).mark_line(point=False).encode(
+    x=alt.X("fecha:T", title="Fecha"),
+    y=alt.Y("percentil:Q", title="Percentil")
+)
 
-                    puntos = alt.Chart(df_prueba).mark_circle(size=90).encode(
-                        x=alt.X("fecha:T"),
-                        y=alt.Y("percentil:Q")
-                    )
+puntos = alt.Chart(df_prueba).mark_circle(size=90).encode(
+    x=alt.X("fecha:T"),
+    y=alt.Y("percentil:Q")
+)
 
-                    etiquetas = alt.Chart(df_prueba).mark_text(
-                        dy=-12,
-                        fontSize=12
-                    ).encode(
-                        x=alt.X("fecha:T"),
-                        y=alt.Y("percentil:Q"),
-                        text="Etiqueta:N"
-                    )
+etiquetas = alt.Chart(df_prueba).mark_text(
+    dy=-12,
+    fontSize=12
+).encode(
+    x=alt.X("fecha:T"),
+    y=alt.Y("percentil:Q"),
+    text="Etiqueta:N"
+)
 
                     grafico = (linea + puntos + etiquetas).properties(height=320)
 
                     st.altair_chart(grafico, use_container_width=True)
     else:
         st.info("Todavía no hay evaluaciones guardadas para este paciente.")
+
