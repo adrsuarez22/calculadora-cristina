@@ -141,7 +141,7 @@ def guardar_evaluacion(paciente, sexo, edad, prueba, valor_medido, percentil, cl
         "edad": int(edad),
         "prueba": str(prueba).strip(),
         "valor_medido": float(valor_medido),
-        "percentilo": round(float(percentil), 1) if percentil is not None else None,
+        "percentil": round(float(percentil), 1) if percentil is not None else None,
         "clasificacion": str(clasificacion).strip()
     }
     return supabase.table("evaluaciones").insert(payload).execute()
@@ -300,9 +300,6 @@ def calcular_resultado(prueba, sexo, edad, altura, valor_medido):
     edad = int(edad)
     valor_medido = float(valor_medido)
 
-    # -----------------------------------------------------
-    # CAMINATA 6 MINUTOS
-    # -----------------------------------------------------
     if prueba == "Caminata 6 minutos":
         altura = int(altura)
         altura_ref = min(TABLA_CAMINATA_6M.keys(), key=lambda x: abs(x - altura))
@@ -326,9 +323,6 @@ def calcular_resultado(prueba, sexo, edad, altura, valor_medido):
             f"Edad ref.: {edad_ref} años"
         )
 
-    # -----------------------------------------------------
-    # PRENSIÓN MANUAL
-    # -----------------------------------------------------
     if prueba == "Prensión manual":
         grupo = grupo_edad_prension(edad)
         percentiles = TABLA_PRENSION[sexo][grupo]
@@ -349,9 +343,6 @@ def calcular_resultado(prueba, sexo, edad, altura, valor_medido):
             f"Grupo etario: {grupo}"
         )
 
-    # -----------------------------------------------------
-    # LEVANTARSE DE LA SILLA
-    # -----------------------------------------------------
     if prueba == "Levantarse de la silla":
         grupo = grupo_edad_silla(edad)
 
@@ -384,14 +375,20 @@ def calcular_resultado(prueba, sexo, edad, altura, valor_medido):
 st.title("Calculadora de Condición Física")
 
 pacientes_existentes = obtener_pacientes_existentes()
-opciones_paciente = [""] + pacientes_existentes + ["Otro / escribir nuevo"]
 
-paciente_opcion = st.selectbox("Paciente", options=opciones_paciente, index=0)
+paciente_existente = st.selectbox(
+    "Seleccionar paciente existente (opcional)",
+    options=[""] + pacientes_existentes,
+    index=0
+)
 
-if paciente_opcion == "Otro / escribir nuevo":
-    paciente = st.text_input("Nombre del paciente")
-else:
-    paciente = paciente_opcion
+paciente_manual = st.text_input(
+    "Nombre del paciente",
+    value=paciente_existente if paciente_existente else "",
+    placeholder="Escribí el nombre del paciente"
+)
+
+paciente = str(paciente_manual).strip()
 
 prueba = st.selectbox(
     "Seleccionar prueba",
@@ -400,7 +397,6 @@ prueba = st.selectbox(
 
 sexo = st.selectbox("Sexo", ["Hombre", "Mujer"])
 
-# Inputs dinámicos por prueba
 altura = None
 valor_medido = None
 
@@ -501,7 +497,7 @@ st.write(f"**Interpretación clínica:** {interpretacion_clinica(clasificacion)}
 # GUARDADO
 # =========================================================
 if st.button("Guardar evaluación"):
-    if not paciente or str(paciente).strip() == "":
+    if not paciente:
         st.warning("Ingresá el nombre del paciente antes de guardar.")
     elif percentil is None:
         st.warning("No se pudo calcular el percentil.")
@@ -522,15 +518,15 @@ if st.button("Guardar evaluación"):
             st.error(f"Error al guardar: {e}")
 
 # =========================================================
-# HISTORIAL
+# HISTORIAL Y GRAFICOS
 # =========================================================
-if paciente and str(paciente).strip() != "":
+if paciente:
     st.markdown("### Historial del paciente")
 
     df_historial = obtener_historial_paciente(paciente)
 
     if not df_historial.empty:
-        columnas_mostrar = ["fecha", "prueba", "valor_medido", "percentilo", "clasificacion"]
+        columnas_mostrar = ["fecha", "prueba", "valor_medido", "percentil", "clasificacion"]
         columnas_existentes = [c for c in columnas_mostrar if c in df_historial.columns]
         df_historial_mostrar = df_historial[columnas_existentes].copy()
 
@@ -546,61 +542,56 @@ if paciente and str(paciente).strip() != "":
             hide_index=True
         )
 
-# =====================================================
-# GRAFICOS POR PRUEBA CON ETIQUETAS VISIBLES
-# =====================================================
-if "fecha" in df_historial.columns and "percentilo" in df_historial.columns and "prueba" in df_historial.columns:
-    df_graf_base = df_historial.copy()
+        if "fecha" in df_historial.columns and "percentil" in df_historial.columns and "prueba" in df_historial.columns:
+            df_graf_base = df_historial.copy()
 
-    df_graf_base["fecha"] = pd.to_datetime(df_graf_base["fecha"], errors="coerce")
-    df_graf_base["percentilo"] = pd.to_numeric(df_graf_base["percentilo"], errors="coerce")
-    df_graf_base["prueba"] = df_graf_base["prueba"].astype(str).str.strip()
+            df_graf_base["fecha"] = pd.to_datetime(df_graf_base["fecha"], errors="coerce")
+            df_graf_base["percentil"] = pd.to_numeric(df_graf_base["percentil"], errors="coerce")
+            df_graf_base["prueba"] = df_graf_base["prueba"].astype(str).str.strip()
 
-    df_graf_base = df_graf_base.dropna(subset=["fecha", "percentilo", "prueba"])
+            df_graf_base = df_graf_base.dropna(subset=["fecha", "percentil", "prueba"])
 
-    pruebas_orden = [
-        "Caminata 6 minutos",
-        "Prensión manual",
-        "Levantarse de la silla"
-    ]
+            pruebas_orden = [
+                "Caminata 6 minutos",
+                "Prensión manual",
+                "Levantarse de la silla"
+            ]
 
-    for prueba_graf in pruebas_orden:
-        df_prueba = df_graf_base[df_graf_base["prueba"] == prueba_graf].copy()
+            for prueba_graf in pruebas_orden:
+                df_prueba = df_graf_base[df_graf_base["prueba"] == prueba_graf].copy()
 
-        if not df_prueba.empty:
-            # Si hay más de un registro el mismo día para la misma prueba,
-            # se promedia el percentilo para evitar duplicados visuales.
-            df_prueba = (
-                df_prueba.groupby("fecha", as_index=False)["percentilo"]
-                .mean()
-                .sort_values("fecha")
-            )
+                if not df_prueba.empty:
+                    df_prueba = (
+                        df_prueba.groupby("fecha", as_index=False)["percentil"]
+                        .mean()
+                        .sort_values("fecha")
+                    )
 
-            df_prueba["Etiqueta"] = df_prueba["percentilo"].apply(lambda x: f"P{round(x,1)}")
+                    df_prueba["Etiqueta"] = df_prueba["percentil"].apply(lambda x: f"P{round(x, 1)}")
 
-            st.markdown(f"### Evolución del percentil - {prueba_graf}")
+                    st.markdown(f"### Evolución del percentil - {prueba_graf}")
 
-            linea = alt.Chart(df_prueba).mark_line(point=False).encode(
-                x=alt.X("fecha:T", title="Fecha"),
-                y=alt.Y("percentilo:Q", title="Percentil")
-            )
+                    linea = alt.Chart(df_prueba).mark_line(point=False).encode(
+                        x=alt.X("fecha:T", title="Fecha"),
+                        y=alt.Y("percentil:Q", title="Percentil")
+                    )
 
-            puntos = alt.Chart(df_prueba).mark_circle(size=90).encode(
-                x=alt.X("fecha:T"),
-                y=alt.Y("percentilo:Q")
-            )
+                    puntos = alt.Chart(df_prueba).mark_circle(size=90).encode(
+                        x=alt.X("fecha:T"),
+                        y=alt.Y("percentil:Q")
+                    )
 
-            etiquetas = alt.Chart(df_prueba).mark_text(
-                dy=-12,
-                fontSize=12
-            ).encode(
-                x=alt.X("fecha:T"),
-                y=alt.Y("percentilo:Q"),
-                text="Etiqueta:N"
-            )
+                    etiquetas = alt.Chart(df_prueba).mark_text(
+                        dy=-12,
+                        fontSize=12
+                    ).encode(
+                        x=alt.X("fecha:T"),
+                        y=alt.Y("percentil:Q"),
+                        text="Etiqueta:N"
+                    )
 
-            grafico = (linea + puntos + etiquetas).properties(
-                height=320
-            )
+                    grafico = (linea + puntos + etiquetas).properties(height=320)
 
-            st.altair_chart(grafico, use_container_width=True)
+                    st.altair_chart(grafico, use_container_width=True)
+    else:
+        st.info("Todavía no hay evaluaciones guardadas para este paciente.")
