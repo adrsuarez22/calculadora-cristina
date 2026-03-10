@@ -571,28 +571,35 @@ if paciente:
 
                     st.markdown(f"### Evolución del percentil - {prueba_graf}")
 
-linea = alt.Chart(df_prueba).mark_line(point=False).encode(
-    x=alt.X("fecha:T", title="Fecha"),
-    y=alt.Y("percentil:Q", title="Percentil")
-)
+                    st.markdown(f"### Evolución del percentil - {prueba_graf}")
 
-puntos = alt.Chart(df_prueba).mark_circle(size=90).encode(
-    x=alt.X("fecha:T"),
-    y=alt.Y("percentil:Q")
-)
+                    linea = alt.Chart(df_prueba).mark_line(point=False).encode(
+                        x=alt.X("fecha:T", title="Fecha"),
+                        y=alt.Y("percentil:Q", title="Percentil")
+                    )
 
-etiquetas = alt.Chart(df_prueba).mark_text(
-    dy=-12,
-    fontSize=12
-).encode(
-    x=alt.X("fecha:T"),
-    y=alt.Y("percentil:Q"),
-    text="Etiqueta:N"
-)
+                    puntos = alt.Chart(df_prueba).mark_circle(size=90).encode(
+                        x=alt.X("fecha:T"),
+                        y=alt.Y("percentil:Q")
+                    )
+
+                    etiquetas = alt.Chart(df_prueba).mark_text(
+                        dy=-12,
+                        fontSize=12
+                    ).encode(
+                        x=alt.X("fecha:T"),
+                        y=alt.Y("percentil:Q"),
+                        text="Etiqueta:N"
+                    )
+
+                    grafico = (linea + puntos + etiquetas).properties(height=320)
+
+                    st.altair_chart(grafico, use_container_width=True)
 
                     grafico = (linea + puntos + etiquetas).properties(height=320)
 
                     st.altair_chart(grafico, use_container_width=True)
     else:
         st.info("Todavía no hay evaluaciones guardadas para este paciente.")
+
 
