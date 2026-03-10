@@ -601,7 +601,7 @@ if paciente_nombre:
         st.download_button(
             label="Descargar historial CSV",
             data=csv_historial,
-            file_name=f"historial_{paciente.replace(' ', '_')}.csv",
+            file_name=f"historial_{paciente_nombre.replace(' ', '_')}.csv",
             mime="text/csv"
         )
 
@@ -611,7 +611,7 @@ if paciente_nombre:
         st.download_button(
             label="Descargar historial PDF",
             data=pdf_buffer,
-            file_name=f"historial_{paciente.replace(' ', '_')}.pdf",
+            file_name=f"historial_{paciente_nombre}.pdf",
             mime="application/pdf"
         )
 
@@ -693,6 +693,7 @@ if paciente_nombre:
                             st.info("Sin cambios respecto a la evaluación anterior")
     else:
         st.info("Todavía no hay evaluaciones guardadas para este paciente.")
+
 
 
 
