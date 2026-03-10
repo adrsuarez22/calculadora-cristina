@@ -585,7 +585,7 @@ if paciente:
 
                     ultimo = df_prueba["percentil"].iloc[-1]
 
-                if len(df_prueba) >= 2:
+                    if len(df_prueba) >= 2:
                     anterior = df_prueba["percentil"].iloc[-2]
                     diferencia = round(ultimo - anterior, 1)
                     texto_cambio = f"{diferencia:+.1f}"
@@ -628,4 +628,5 @@ if paciente:
                             st.info("Sin cambios respecto a la evaluación anterior")
     else:
         st.info("Todavía no hay evaluaciones guardadas para este paciente.")
+
 
