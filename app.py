@@ -606,8 +606,7 @@ if paciente_nombre:
         )
 
         # ---- Descargar PDF ----
-        pdf_buffer = generar_pdf_historial(paciente, df_historial_mostrar)
-
+        pdf_buffer = generar_pdf_historial(paciente_nombre, df_historial_mostrar)
         st.download_button(
             label="Descargar historial PDF",
             data=pdf_buffer,
@@ -693,6 +692,7 @@ if paciente_nombre:
                             st.info("Sin cambios respecto a la evaluación anterior")
     else:
         st.info("Todavía no hay evaluaciones guardadas para este paciente.")
+
 
 
 
