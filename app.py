@@ -537,14 +537,14 @@ paciente_nombre = st.selectbox(
 ficha = obtener_ficha_paciente(paciente_nombre)
 
 st.markdown("### Ficha del paciente")
-
-with st.container(border=True):
-    st.write(f"**Nombre:** {ficha['nombre']}")
-    st.write(f"**Sexo:** {str(ficha['sexo']).capitalize() if ficha['sexo'] != '-' else '-'}")
-    st.write(f"**Evaluaciones:** {ficha['cantidad_evaluaciones']}")
-    st.write(f"**Última evaluación:** {ficha['ultima_fecha']}")
-    st.write(f"**Última clasificación:** {ficha['ultima_clasificacion']}")
-    st.write(f"**Última prueba registrada:** {ficha['ultima_prueba']}")
+st.caption(
+    f"Paciente: {ficha['nombre']} | "
+    f"Sexo: {str(ficha['sexo']).capitalize() if ficha['sexo'] != '-' else '-'} | "
+    f"Evaluaciones: {ficha['cantidad_evaluaciones']} | "
+    f"Última evaluación: {ficha['ultima_fecha']} | "
+    f"Última clasificación: {ficha['ultima_clasificacion']} | "
+    f"Última prueba: {ficha['ultima_prueba']}"
+)
 
 st.divider()
 paciente_sexo_guardado = next((p["sexo"] for p in pacientes if p["nombre"] == paciente_nombre), None)
@@ -848,6 +848,7 @@ if paciente_nombre:
                             st.info("Sin cambios respecto a la evaluación anterior")
     else:
         st.info("Todavía no hay evaluaciones guardadas para este paciente.")
+
 
 
 
