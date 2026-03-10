@@ -574,7 +574,7 @@ if paciente:
             for prueba_graf in pruebas_orden:
                 df_prueba = df_graf_base[df_graf_base["prueba"] == prueba_graf].copy()
 
-                if not df_prueba.empty:
+                               if not df_prueba.empty:
                     df_prueba = (
                         df_prueba.groupby("fecha", as_index=False)["percentil"]
                         .mean()
@@ -586,14 +586,14 @@ if paciente:
                     ultimo = df_prueba["percentil"].iloc[-1]
 
                     if len(df_prueba) >= 2:
-                    anterior = df_prueba["percentil"].iloc[-2]
-                    diferencia = round(ultimo - anterior, 1)
-                    texto_cambio = f"{diferencia:+.1f}"
+                        anterior = df_prueba["percentil"].iloc[-2]
+                        diferencia = round(ultimo - anterior, 1)
+                        texto_cambio = f"{diferencia:+.1f}"
                     else:
-                    texto_cambio = "N/D"
+                        texto_cambio = "N/D"
 
                     st.caption(f"Percentil actual: P{round(ultimo, 1)} | Cambio vs anterior: {texto_cambio}")
-                
+
                     st.markdown(f"### Evolución del percentil - {prueba_graf}")
 
                     linea = alt.Chart(df_prueba).mark_line(point=False).encode(
@@ -615,7 +615,7 @@ if paciente:
                         text="Etiqueta:N"
                     )
 
-                    grafico = (linea + puntos + etiquetas).properties(height=320)
+                    grafico = (linea + puntos + etiquetas).properties(height=260)
 
                     st.altair_chart(grafico, use_container_width=True)
 
@@ -628,5 +628,6 @@ if paciente:
                             st.info("Sin cambios respecto a la evaluación anterior")
     else:
         st.info("Todavía no hay evaluaciones guardadas para este paciente.")
+
 
 
