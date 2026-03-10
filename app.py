@@ -484,6 +484,16 @@ def calcular_resultado(prueba, sexo, edad, altura, valor_medido):
 # UI
 # =========================================================
 st.title("Calculadora de Condición Física")
+st.markdown("""
+<style>
+div[data-testid="stMetricValue"] {
+    font-size: 1.5rem !important;
+}
+div[data-testid="stMetricLabel"] {
+    font-size: 0.85rem !important;
+}
+</style>
+""", unsafe_allow_html=True)
 
 with st.expander("➕ Nuevo paciente"):
     nuevo_nombre = st.text_input("Nombre del nuevo paciente", key="nuevo_nombre_alta")
@@ -838,4 +848,5 @@ if paciente_nombre:
                             st.info("Sin cambios respecto a la evaluación anterior")
     else:
         st.info("Todavía no hay evaluaciones guardadas para este paciente.")
+
 
