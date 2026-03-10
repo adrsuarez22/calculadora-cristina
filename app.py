@@ -585,7 +585,7 @@ if st.button("Guardar evaluación"):
 if paciente_nombre:
     st.markdown("### Historial del paciente")
 
-    df_historial = obtener_historial_paciente(paciente_nombre)
+        df_historial = obtener_historial_paciente(paciente_nombre)
 
         if not df_historial.empty:
         prueba_filtro = st.selectbox(
@@ -732,4 +732,5 @@ if paciente_nombre:
 
     else:
         st.info("Todavía no hay evaluaciones guardadas para este paciente.")
+
 
