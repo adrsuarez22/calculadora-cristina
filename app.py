@@ -24,10 +24,6 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 # =========================================================
 # TABLAS NORMATIVAS
 # =========================================================
-
-# -------------------------
-# 1) CAMINATA 6 MINUTOS
-# -------------------------
 TABLA_CAMINATA_6M = {
     150: {
         40: {2.5: 436, 10: 470, 25: 511, 50: 555, 75: 592, 90: 631, 97.5: 679},
@@ -66,9 +62,6 @@ TABLA_CAMINATA_6M = {
     }
 }
 
-# -------------------------
-# 2) PRENSIÓN MANUAL
-# -------------------------
 TABLA_PRENSION = {
     "Hombre": {
         "20-24": {5: 33.9, 10: 36.8, 20: 40.5, 30: 43.2, 40: 45.7, 50: 48.0, 60: 50.4, 70: 52.9, 80: 56.0, 90: 60.1, 95: 63.6},
@@ -110,9 +103,6 @@ TABLA_PRENSION = {
     }
 }
 
-# -------------------------
-# 3) LEVANTARSE DE LA SILLA
-# -------------------------
 TABLA_SILLA = {
     "Hombre": {
         "65-69": {10: 12, 20: 13, 30: 14, 40: 15, 50: 16, 60: 16, 70: 17, 80: 19, 90: 21, 100: 28},
@@ -526,9 +516,22 @@ if paciente:
     df_historial = obtener_historial_paciente(paciente)
 
     if not df_historial.empty:
+        prueba_filtro = st.selectbox(
+            "Filtrar historial por prueba",
+            options=["Todas"] + ["Caminata 6 minutos", "Prensión manual", "Levantarse de la silla"],
+            index=0
+        )
+
+        if prueba_filtro == "Todas":
+            df_historial_filtrado = df_historial.copy()
+        else:
+            df_historial_filtrado = df_historial[
+                df_historial["prueba"].astype(str).str.strip() == prueba_filtro
+            ].copy()
+
         columnas_mostrar = ["fecha", "prueba", "valor_medido", "percentil", "clasificacion"]
-        columnas_existentes = [c for c in columnas_mostrar if c in df_historial.columns]
-        df_historial_mostrar = df_historial[columnas_existentes].copy()
+        columnas_existentes = [c for c in columnas_mostrar if c in df_historial_filtrado.columns]
+        df_historial_mostrar = df_historial_filtrado[columnas_existentes].copy()
 
         if "fecha" in df_historial_mostrar.columns:
             df_historial_mostrar["fecha"] = pd.to_datetime(
@@ -540,6 +543,14 @@ if paciente:
             df_historial_mostrar.sort_values(by="fecha", ascending=False),
             use_container_width=True,
             hide_index=True
+        )
+
+        csv_historial = df_historial_mostrar.to_csv(index=False).encode("utf-8")
+        st.download_button(
+            label="Descargar historial CSV",
+            data=csv_historial,
+            file_name=f"historial_{paciente.replace(' ', '_')}.csv",
+            mime="text/csv"
         )
 
         if "fecha" in df_historial.columns and "percentil" in df_historial.columns and "prueba" in df_historial.columns:
@@ -557,6 +568,9 @@ if paciente:
                 "Levantarse de la silla"
             ]
 
+            if prueba_filtro != "Todas":
+                pruebas_orden = [prueba_filtro]
+
             for prueba_graf in pruebas_orden:
                 df_prueba = df_graf_base[df_graf_base["prueba"] == prueba_graf].copy()
 
@@ -568,6 +582,21 @@ if paciente:
                     )
 
                     df_prueba["Etiqueta"] = df_prueba["percentil"].apply(lambda x: f"P{round(x, 1)}")
+
+                    ultimo = df_prueba["percentil"].iloc[-1]
+
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.metric("Percentil actual", f"P{round(ultimo, 1)}")
+
+                    if len(df_prueba) >= 2:
+                        anterior = df_prueba["percentil"].iloc[-2]
+                        diferencia = round(ultimo - anterior, 1)
+                        with col2:
+                            st.metric("Cambio vs anterior", f"{diferencia:+.1f}")
+                    else:
+                        with col2:
+                            st.metric("Cambio vs anterior", "N/D")
 
                     st.markdown(f"### Evolución del percentil - {prueba_graf}")
 
@@ -595,10 +624,6 @@ if paciente:
                     st.altair_chart(grafico, use_container_width=True)
 
                     if len(df_prueba) >= 2:
-                        ultimo = df_prueba["percentil"].iloc[-1]
-                        anterior = df_prueba["percentil"].iloc[-2]
-                        diferencia = round(ultimo - anterior, 1)
-
                         if diferencia > 0:
                             st.success(f"↑ Mejora de {diferencia} percentiles desde la evaluación anterior")
                         elif diferencia < 0:
@@ -607,13 +632,3 @@ if paciente:
                             st.info("Sin cambios respecto a la evaluación anterior")
     else:
         st.info("Todavía no hay evaluaciones guardadas para este paciente.")
-
-
-
-
-
-
-
-
-
-
