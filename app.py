@@ -592,9 +592,27 @@ if paciente:
 
                     grafico = (linea + puntos + etiquetas).properties(height=320)
 
-                    st.altair_chart(grafico, use_container_width=True)
+                                        st.altair_chart(grafico, use_container_width=True)
+
+                    # evolución respecto a la medición anterior
+                    if len(df_prueba) >= 2:
+
+                        ultimo = df_prueba["percentil"].iloc[-1]
+                        anterior = df_prueba["percentil"].iloc[-2]
+
+                        diferencia = round(ultimo - anterior, 1)
+
+                        if diferencia > 0:
+                            st.success(f"↑ Mejora de {diferencia} percentiles desde la evaluación anterior")
+
+                        elif diferencia < 0:
+                            st.warning(f"↓ Disminución de {abs(diferencia)} percentiles desde la evaluación anterior")
+
+                        else:
+                            st.info("Sin cambios respecto a la evaluación anterior")
     else:
         st.info("Todavía no hay evaluaciones guardadas para este paciente.")
+
 
 
 
