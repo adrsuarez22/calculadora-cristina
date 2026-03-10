@@ -603,14 +603,14 @@ if paciente:
         mime="text/csv"
         )
 
-pdf_buffer = generar_pdf_historial(paciente, df_historial_mostrar)
+        pdf_buffer = generar_pdf_historial(paciente, df_historial_mostrar)
 
-    st.download_button(
-    label="Descargar historial PDF",
-    data=pdf_buffer,
-    file_name=f"historial_{paciente}.pdf",
-    mime="application/pdf"
-)
+        st.download_button(
+        label="Descargar historial PDF",
+        data=pdf_buffer,
+        file_name=f"historial_{paciente}.pdf",
+        mime="application/pdf"
+        )
 
         if "fecha" in df_historial.columns and "percentil" in df_historial.columns and "prueba" in df_historial.columns:
             df_graf_base = df_historial.copy()
@@ -690,6 +690,7 @@ pdf_buffer = generar_pdf_historial(paciente, df_historial_mostrar)
                             st.info("Sin cambios respecto a la evaluación anterior")
     else:
         st.info("Todavía no hay evaluaciones guardadas para este paciente.")
+
 
 
 
