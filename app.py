@@ -160,9 +160,11 @@ def guardar_paciente(nombre, sexo):
     }
     return supabase.table("pacientes").insert(payload).execute()
 
+
 def eliminar_evaluacion(id_registro):
     return supabase.table("evaluaciones").delete().eq("id", id_registro).execute()
-    
+
+
 def generar_pdf_historial(paciente, df):
     buffer = BytesIO()
     pdf = canvas.Canvas(buffer, pagesize=letter)
@@ -190,11 +192,11 @@ def generar_pdf_historial(paciente, df):
     pdf.setFont("Helvetica", 10)
 
     for _, row in df.iterrows():
-        pdf.drawString(50, y, str(row["fecha"]))
-        pdf.drawString(130, y, str(row["prueba"]))
-        pdf.drawString(300, y, str(row["valor_medido"]))
-        pdf.drawString(360, y, str(row["percentil"]))
-        pdf.drawString(440, y, str(row["clasificacion"]))
+        pdf.drawString(50, y, str(row.get("fecha", "")))
+        pdf.drawString(130, y, str(row.get("prueba", "")))
+        pdf.drawString(300, y, str(row.get("valor_medido", "")))
+        pdf.drawString(360, y, str(row.get("percentil", "")))
+        pdf.drawString(440, y, str(row.get("clasificacion", "")))
 
         y -= 18
 
@@ -228,11 +230,73 @@ def obtener_historial_paciente(paciente):
 
 def obtener_pacientes():
     try:
-        respuesta = supabase.table("pacientes").select("id,nombre,sexo").order("nombre").execute()
+        respuesta = (
+            supabase.table("pacientes")
+            .select("id,nombre,sexo")
+            .order("nombre")
+            .execute()
+        )
         return respuesta.data if respuesta.data else []
     except Exception as e:
         st.error(f"Error al leer pacientes: {e}")
         return []
+
+
+def obtener_ficha_paciente(paciente_nombre):
+    try:
+        paciente_nombre = str(paciente_nombre).strip()
+
+        respuesta_paciente = (
+            supabase.table("pacientes")
+            .select("nombre, sexo, created_at")
+            .eq("nombre", paciente_nombre)
+            .limit(1)
+            .execute()
+        )
+
+        datos_paciente = respuesta_paciente.data[0] if respuesta_paciente.data else {}
+        df_historial = obtener_historial_paciente(paciente_nombre)
+
+        cantidad_evaluaciones = 0
+        ultima_fecha = "-"
+        ultima_clasificacion = "-"
+        ultima_prueba = "-"
+
+        if not df_historial.empty:
+            if "fecha" in df_historial.columns:
+                df_historial["fecha"] = pd.to_datetime(df_historial["fecha"], errors="coerce")
+                df_historial = df_historial.sort_values("fecha", ascending=False)
+
+            cantidad_evaluaciones = len(df_historial)
+
+            if "fecha" in df_historial.columns and pd.notna(df_historial.iloc[0]["fecha"]):
+                ultima_fecha = df_historial.iloc[0]["fecha"].strftime("%d-%m-%Y")
+
+            if "clasificacion" in df_historial.columns and pd.notna(df_historial.iloc[0]["clasificacion"]):
+                ultima_clasificacion = str(df_historial.iloc[0]["clasificacion"])
+
+            if "prueba" in df_historial.columns and pd.notna(df_historial.iloc[0]["prueba"]):
+                ultima_prueba = str(df_historial.iloc[0]["prueba"])
+
+        return {
+            "nombre": datos_paciente.get("nombre", paciente_nombre),
+            "sexo": datos_paciente.get("sexo", "-"),
+            "cantidad_evaluaciones": cantidad_evaluaciones,
+            "ultima_fecha": ultima_fecha,
+            "ultima_clasificacion": ultima_clasificacion,
+            "ultima_prueba": ultima_prueba
+        }
+
+    except Exception as e:
+        st.error(f"Error al cargar ficha del paciente: {e}")
+        return {
+            "nombre": paciente_nombre,
+            "sexo": "-",
+            "cantidad_evaluaciones": 0,
+            "ultima_fecha": "-",
+            "ultima_clasificacion": "-",
+            "ultima_prueba": "-"
+        }
 
 
 def clasificar_percentil(percentil):
@@ -415,14 +479,19 @@ def calcular_resultado(prueba, sexo, edad, altura, valor_medido):
 
     return None, "Sin clasificar", "-", "-", "-"
 
+
 # =========================================================
 # UI
 # =========================================================
 st.title("Calculadora de Condición Física")
 
 with st.expander("➕ Nuevo paciente"):
-    nuevo_nombre = st.text_input("Nombre del nuevo paciente", key="nuevo_nombre")
-    nuevo_sexo = st.selectbox("Sexo del nuevo paciente", ["hombre", "mujer"], key="nuevo_sexo")
+    nuevo_nombre = st.text_input("Nombre del nuevo paciente", key="nuevo_nombre_alta")
+    nuevo_sexo = st.selectbox(
+        "Sexo del nuevo paciente",
+        ["hombre", "mujer"],
+        key="nuevo_sexo_alta"
+    )
 
     if st.button("Guardar paciente", key="btn_guardar_paciente"):
         if not nuevo_nombre.strip():
@@ -442,13 +511,37 @@ if not opciones_pacientes:
     st.warning("No hay pacientes cargados. Agregá uno desde '➕ Nuevo paciente'.")
     st.stop()
 
-paciente_nombre = st.selectbox("Seleccionar paciente", opciones_pacientes)
+paciente_nombre = st.selectbox(
+    "Seleccionar paciente",
+    opciones_pacientes,
+    key="selector_paciente"
+)
+
+# =========================================================
+# FICHA DEL PACIENTE
+# =========================================================
+ficha = obtener_ficha_paciente(paciente_nombre)
+
+st.markdown("### Ficha del paciente")
+
+c1, c2 = st.columns(2)
+c1.write(f"**Nombre:** {ficha['nombre']}")
+c2.write(f"**Sexo:** {str(ficha['sexo']).capitalize() if ficha['sexo'] != '-' else '-'}")
+
+c3, c4, c5 = st.columns(3)
+c3.metric("Evaluaciones", ficha["cantidad_evaluaciones"])
+c4.metric("Última evaluación", ficha["ultima_fecha"])
+c5.metric("Última clasificación", ficha["ultima_clasificacion"])
+
+st.write(f"**Última prueba registrada:** {ficha['ultima_prueba']}")
+st.divider()
 
 paciente_sexo_guardado = next((p["sexo"] for p in pacientes if p["nombre"] == paciente_nombre), None)
 
 prueba = st.selectbox(
     "Seleccionar prueba",
-    ["Caminata 6 minutos", "Prensión manual", "Levantarse de la silla"]
+    ["Caminata 6 minutos", "Prensión manual", "Levantarse de la silla"],
+    key="selector_prueba"
 )
 
 sexo_default = "Hombre"
@@ -457,43 +550,51 @@ if paciente_sexo_guardado == "mujer":
 elif paciente_sexo_guardado == "hombre":
     sexo_default = "Hombre"
 
-sexo = st.selectbox("Sexo", ["Hombre", "Mujer"], index=0 if sexo_default == "Hombre" else 1)
+sexo = st.selectbox(
+    "Sexo",
+    ["Hombre", "Mujer"],
+    index=0 if sexo_default == "Hombre" else 1,
+    key="selector_sexo"
+)
 
 altura = None
 valor_medido = None
 
 if prueba == "Caminata 6 minutos":
-    edad = st.selectbox("Edad", list(range(40, 81)), index=20)
-    altura = st.selectbox("Altura (cm)", [150, 160, 170, 180, 190], index=2)
+    edad = st.selectbox("Edad", list(range(40, 81)), index=20, key="edad_caminata")
+    altura = st.selectbox("Altura (cm)", [150, 160, 170, 180, 190], index=2, key="altura_caminata")
     valor_medido = st.number_input(
         "Distancia caminada (metros)",
         min_value=0.0,
         max_value=2000.0,
         value=600.0,
         step=1.0,
-        format="%.2f"
+        format="%.2f",
+        key="valor_caminata"
     )
 
 elif prueba == "Prensión manual":
-    edad = st.selectbox("Edad", list(range(20, 101)), index=45)
+    edad = st.selectbox("Edad", list(range(20, 101)), index=45, key="edad_prension")
     valor_medido = st.number_input(
         "Fuerza de prensión (kg)",
         min_value=0.0,
         max_value=100.0,
         value=25.0,
         step=0.1,
-        format="%.1f"
+        format="%.1f",
+        key="valor_prension"
     )
 
 elif prueba == "Levantarse de la silla":
-    edad = st.selectbox("Edad", list(range(65, 101)), index=10)
+    edad = st.selectbox("Edad", list(range(65, 101)), index=10, key="edad_silla")
     valor_medido = st.number_input(
         "Cantidad de repeticiones",
         min_value=0.0,
         max_value=60.0,
         value=12.0,
         step=1.0,
-        format="%.0f"
+        format="%.0f",
+        key="valor_silla"
     )
 
 percentil, clasificacion, referencia_p50, referencia_altura, referencia_edad = calcular_resultado(
@@ -558,7 +659,7 @@ st.write(f"**Interpretación clínica:** {interpretacion_clinica(clasificacion)}
 # =========================================================
 # GUARDADO
 # =========================================================
-if st.button("Guardar evaluación"):
+if st.button("Guardar evaluación", key="btn_guardar_evaluacion"):
     if not paciente_nombre:
         st.warning("Seleccioná un paciente antes de guardar.")
     elif percentil is None:
@@ -591,7 +692,8 @@ if paciente_nombre:
         prueba_filtro = st.selectbox(
             "Filtrar historial por prueba",
             options=["Todas", "Caminata 6 minutos", "Prensión manual", "Levantarse de la silla"],
-            index=0
+            index=0,
+            key="filtro_historial_prueba"
         )
 
         if prueba_filtro == "Todas":
@@ -618,27 +720,33 @@ if paciente_nombre:
         for _, row in df_historial_mostrar.iterrows():
             col1, col2, col3, col4, col5, col6 = st.columns([1, 2, 1, 1, 1, 0.5])
 
-            col1.write(row["fecha"])
-            col2.write(row["prueba"])
-            col3.write(row["valor_medido"])
-            col4.write(row["percentil"])
-            col5.write(row["clasificacion"])
+            col1.write(row.get("fecha", ""))
+            col2.write(row.get("prueba", ""))
+            col3.write(row.get("valor_medido", ""))
+            col4.write(row.get("percentil", ""))
+            col5.write(row.get("clasificacion", ""))
 
             if col6.button("🗑", key=f"del_{row['id']}"):
                 try:
                     eliminar_evaluacion(row["id"])
-                    st.success("Evaluación eliminada")
+                    st.success("Evaluación eliminada.")
                     st.rerun()
                 except Exception as e:
                     st.error(f"Error al eliminar: {e}")
 
-        csv_historial = df_historial_mostrar.drop(columns=["id"], errors="ignore").to_csv(index=False).encode("utf-8")
+        csv_historial = (
+            df_historial_mostrar
+            .drop(columns=["id"], errors="ignore")
+            .to_csv(index=False)
+            .encode("utf-8")
+        )
 
         st.download_button(
             label="Descargar historial CSV",
             data=csv_historial,
             file_name=f"historial_{paciente_nombre.replace(' ', '_')}.csv",
-            mime="text/csv"
+            mime="text/csv",
+            key="btn_descargar_csv"
         )
 
         pdf_df = df_historial_mostrar.drop(columns=["id"], errors="ignore").copy()
@@ -648,10 +756,11 @@ if paciente_nombre:
             label="Descargar historial PDF",
             data=pdf_buffer,
             file_name=f"historial_{paciente_nombre.replace(' ', '_')}.pdf",
-            mime="application/pdf"
+            mime="application/pdf",
+            key="btn_descargar_pdf"
         )
 
-        if "fecha" in df_historial.columns and "percentil" in df_historial.columns and "prueba" in df_historial.columns:
+        if {"fecha", "percentil", "prueba"}.issubset(df_historial.columns):
             df_graf_base = df_historial.copy()
 
             df_graf_base["fecha"] = pd.to_datetime(df_graf_base["fecha"], errors="coerce").dt.date
@@ -692,7 +801,6 @@ if paciente_nombre:
                         texto_cambio = "N/D"
 
                     st.caption(f"Percentil actual: P{round(ultimo, 1)} | Cambio vs anterior: {texto_cambio}")
-
                     st.markdown(f"### Evolución del percentil - {prueba_graf}")
 
                     linea = alt.Chart(df_prueba).mark_line(point=False).encode(
@@ -729,6 +837,5 @@ if paciente_nombre:
                             st.warning(f"↓ Disminución de {abs(diferencia)} percentiles desde la evaluación anterior")
                         else:
                             st.info("Sin cambios respecto a la evaluación anterior")
-
     else:
         st.info("Todavía no hay evaluaciones guardadas para este paciente.")
