@@ -560,7 +560,7 @@ if paciente:
             for prueba_graf in pruebas_orden:
                 df_prueba = df_graf_base[df_graf_base["prueba"] == prueba_graf].copy()
 
-                                if not df_prueba.empty:
+                if not df_prueba.empty:
                     df_prueba = (
                         df_prueba.groupby("fecha", as_index=False)["percentil"]
                         .mean()
@@ -607,6 +607,7 @@ if paciente:
                             st.info("Sin cambios respecto a la evaluación anterior")
     else:
         st.info("Todavía no hay evaluaciones guardadas para este paciente.")
+
 
 
 
