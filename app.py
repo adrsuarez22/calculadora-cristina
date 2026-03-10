@@ -560,7 +560,7 @@ if paciente:
             for prueba_graf in pruebas_orden:
                 df_prueba = df_graf_base[df_graf_base["prueba"] == prueba_graf].copy()
 
-                if not df_prueba.empty:
+                                if not df_prueba.empty:
                     df_prueba = (
                         df_prueba.groupby("fecha", as_index=False)["percentil"]
                         .mean()
@@ -572,8 +572,8 @@ if paciente:
                     st.markdown(f"### Evolución del percentil - {prueba_graf}")
 
                     linea = alt.Chart(df_prueba).mark_line(point=False).encode(
-                    x=alt.X("fecha:T", title="Fecha", axis=alt.Axis(format="%d-%m-%Y", tickCount="day")),
-                    y=alt.Y("percentil:Q", title="Percentil")
+                        x=alt.X("yearmonthdate(fecha):T", title="Fecha", axis=alt.Axis(format="%d-%m-%Y")),
+                        y=alt.Y("percentil:Q", title="Percentil")
                     )
 
                     puntos = alt.Chart(df_prueba).mark_circle(size=90).encode(
@@ -592,26 +592,22 @@ if paciente:
 
                     grafico = (linea + puntos + etiquetas).properties(height=320)
 
-                                        st.altair_chart(grafico, use_container_width=True)
+                    st.altair_chart(grafico, use_container_width=True)
 
-                    # evolución respecto a la medición anterior
                     if len(df_prueba) >= 2:
-
                         ultimo = df_prueba["percentil"].iloc[-1]
                         anterior = df_prueba["percentil"].iloc[-2]
-
                         diferencia = round(ultimo - anterior, 1)
 
                         if diferencia > 0:
                             st.success(f"↑ Mejora de {diferencia} percentiles desde la evaluación anterior")
-
                         elif diferencia < 0:
                             st.warning(f"↓ Disminución de {abs(diferencia)} percentiles desde la evaluación anterior")
-
                         else:
                             st.info("Sin cambios respecto a la evaluación anterior")
     else:
         st.info("Todavía no hay evaluaciones guardadas para este paciente.")
+
 
 
 
