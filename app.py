@@ -16,6 +16,21 @@ st.set_page_config(
     layout="centered"
 )
 
+st.markdown("""
+<style>
+[data-testid="stAppViewContainer"] {
+    background-color: #f7f8fa;
+}
+
+[data-testid="stHeader"] {
+    background: rgba(0, 0, 0, 0);
+}
+
+[data-testid="stToolbar"] {
+    right: 1rem;
+}
+</style>
+""", unsafe_allow_html=True)
 # =========================================================
 # SUPABASE
 # =========================================================
@@ -842,3 +857,4 @@ if paciente_nombre:
     else:
         st.markdown("### Historial del paciente")
         st.info("Todavía no hay evaluaciones guardadas para este paciente.")
+
