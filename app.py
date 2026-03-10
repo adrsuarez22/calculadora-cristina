@@ -589,27 +589,30 @@ if paciente:
                 errors="coerce"
             ).dt.strftime("%Y-%m-%d")
 
-        st.dataframe(
+                st.dataframe(
             df_historial_mostrar.sort_values(by="fecha", ascending=False),
             use_container_width=True,
             hide_index=True
         )
+
+        # ---- Descargar CSV ----
         csv_historial = df_historial_mostrar.to_csv(index=False).encode("utf-8")
 
         st.download_button(
-        label="Descargar historial CSV",
-        data=csv_historial,
-        file_name=f"historial_{paciente.replace(' ', '_')}.csv",
-        mime="text/csv"
+            label="Descargar historial CSV",
+            data=csv_historial,
+            file_name=f"historial_{paciente.replace(' ', '_')}.csv",
+            mime="text/csv"
         )
 
+        # ---- Descargar PDF ----
         pdf_buffer = generar_pdf_historial(paciente, df_historial_mostrar)
 
         st.download_button(
-        label="Descargar historial PDF",
-        data=pdf_buffer,
-        file_name=f"historial_{paciente}.pdf",
-        mime="application/pdf"
+            label="Descargar historial PDF",
+            data=pdf_buffer,
+            file_name=f"historial_{paciente.replace(' ', '_')}.pdf",
+            mime="application/pdf"
         )
 
         if "fecha" in df_historial.columns and "percentil" in df_historial.columns and "prueba" in df_historial.columns:
@@ -690,6 +693,7 @@ if paciente:
                             st.info("Sin cambios respecto a la evaluación anterior")
     else:
         st.info("Todavía no hay evaluaciones guardadas para este paciente.")
+
 
 
 
