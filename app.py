@@ -540,22 +540,45 @@ if paciente and str(paciente).strip() != "":
             ).dt.strftime("%Y-%m-%d")
 
         st.dataframe(
-            df_historial_mostrar,
+            df_historial_mostrar.sort_values(by="fecha", ascending=False),
             use_container_width=True,
             hide_index=True
         )
 
-        if "fecha" in df_historial.columns and "percentilo" in df_historial.columns:
-            df_graf = df_historial.copy()
-            df_graf["fecha"] = pd.to_datetime(df_graf["fecha"], errors="coerce")
-            df_graf["percentilo"] = pd.to_numeric(df_graf["percentilo"], errors="coerce")
-            df_graf = df_graf.dropna(subset=["fecha", "percentilo"]).sort_values("fecha")
+        # =====================================================
+        # GRAFICOS POR PRUEBA
+        # =====================================================
+        if "fecha" in df_historial.columns and "percentilo" in df_historial.columns and "prueba" in df_historial.columns:
+            df_graf_base = df_historial.copy()
 
-            if not df_graf.empty:
-                st.markdown("### Evolución del percentil")
-                st.line_chart(
-                    df_graf.set_index("fecha")["percentilo"],
-                    use_container_width=True
-                )
+            df_graf_base["fecha"] = pd.to_datetime(df_graf_base["fecha"], errors="coerce")
+            df_graf_base["percentilo"] = pd.to_numeric(df_graf_base["percentilo"], errors="coerce")
+            df_graf_base["prueba"] = df_graf_base["prueba"].astype(str).str.strip()
+
+            df_graf_base = df_graf_base.dropna(subset=["fecha", "percentilo", "prueba"])
+
+            pruebas_orden = [
+                "Caminata 6 minutos",
+                "Prensión manual",
+                "Levantarse de la silla"
+            ]
+
+            for prueba_graf in pruebas_orden:
+                df_prueba = df_graf_base[df_graf_base["prueba"] == prueba_graf].copy()
+
+                if not df_prueba.empty:
+                    # Si hay más de un registro el mismo día para la misma prueba,
+                    # promediamos el percentilo para evitar líneas verticales.
+                    df_prueba = (
+                        df_prueba.groupby("fecha", as_index=False)["percentilo"]
+                        .mean()
+                        .sort_values("fecha")
+                    )
+
+                    st.markdown(f"### Evolución del percentil - {prueba_graf}")
+                    st.line_chart(
+                        df_prueba.set_index("fecha")["percentilo"],
+                        use_container_width=True
+                    )
     else:
         st.info("Todavía no hay evaluaciones guardadas para este paciente.")
