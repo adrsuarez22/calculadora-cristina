@@ -561,14 +561,17 @@ with st.container(border=True):
         st.write("**Última evaluación**")
         st.write(ficha["ultima_fecha"])
 
-    st.write("")
+        st.write("")
 
-    st.write("**Última clasificación**")
-    st.write(ficha["ultima_clasificacion"])
+    col5, col6 = st.columns(2)
 
-    st.write("**Última prueba registrada**")
-    st.write(ficha["ultima_prueba"])
+    with col5:
+        st.write("**Última clasificación**")
+        st.write(ficha["ultima_clasificacion"])
 
+    with col6:
+        st.write("**Última prueba registrada**")
+        st.write(ficha["ultima_prueba"])
 st.divider()
 paciente_sexo_guardado = next((p["sexo"] for p in pacientes if p["nombre"] == paciente_nombre), None)
 
@@ -871,6 +874,7 @@ if paciente_nombre:
                             st.info("Sin cambios respecto a la evaluación anterior")
     else:
         st.info("Todavía no hay evaluaciones guardadas para este paciente.")
+
 
 
 
