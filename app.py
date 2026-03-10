@@ -160,7 +160,9 @@ def guardar_paciente(nombre, sexo):
     }
     return supabase.table("pacientes").insert(payload).execute()
 
-
+def eliminar_evaluacion(id_registro):
+    return supabase.table("evaluaciones").delete().eq("id", id_registro).execute()
+    
 def generar_pdf_historial(paciente, df):
     buffer = BytesIO()
     pdf = canvas.Canvas(buffer, pagesize=letter)
@@ -585,7 +587,7 @@ if paciente_nombre:
 
     df_historial = obtener_historial_paciente(paciente_nombre)
 
-    if not df_historial.empty:
+        if not df_historial.empty:
         prueba_filtro = st.selectbox(
             "Filtrar historial por prueba",
             options=["Todas", "Caminata 6 minutos", "Prensión manual", "Levantarse de la silla"],
@@ -599,7 +601,7 @@ if paciente_nombre:
                 df_historial["prueba"].astype(str).str.strip() == prueba_filtro
             ].copy()
 
-        columnas_mostrar = ["fecha", "prueba", "valor_medido", "percentil", "clasificacion"]
+        columnas_mostrar = ["id", "fecha", "prueba", "valor_medido", "percentil", "clasificacion"]
         columnas_existentes = [c for c in columnas_mostrar if c in df_historial_filtrado.columns]
         df_historial_mostrar = df_historial_filtrado[columnas_existentes].copy()
 
@@ -609,13 +611,29 @@ if paciente_nombre:
                 errors="coerce"
             ).dt.strftime("%Y-%m-%d")
 
-        st.dataframe(
-            df_historial_mostrar.sort_values(by="fecha", ascending=False),
-            use_container_width=True,
-            hide_index=True
-        )
+        df_historial_mostrar = df_historial_mostrar.sort_values(by="fecha", ascending=False)
 
-        csv_historial = df_historial_mostrar.to_csv(index=False).encode("utf-8")
+        st.markdown("**Fecha | Prueba | Valor | Percentil | Clasificación | Eliminar**")
+
+        for i, row in df_historial_mostrar.iterrows():
+            col1, col2, col3, col4, col5, col6 = st.columns([1, 2, 1, 1, 1, 0.5])
+
+            col1.write(row["fecha"])
+            col2.write(row["prueba"])
+            col3.write(row["valor_medido"])
+            col4.write(row["percentil"])
+            col5.write(row["clasificacion"])
+
+            if col6.button("🗑", key=f"del_{row['id']}"):
+                try:
+                    eliminar_evaluacion(row["id"])
+                    st.success("Evaluación eliminada")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error al eliminar: {e}")
+
+        csv_historial = df_historial_mostrar.drop(columns=["id"], errors="ignore").to_csv(index=False).encode("utf-8")
+
         st.download_button(
             label="Descargar historial CSV",
             data=csv_historial,
@@ -623,7 +641,9 @@ if paciente_nombre:
             mime="text/csv"
         )
 
-        pdf_buffer = generar_pdf_historial(paciente_nombre, df_historial_mostrar)
+        pdf_df = df_historial_mostrar.drop(columns=["id"], errors="ignore").copy()
+        pdf_buffer = generar_pdf_historial(paciente_nombre, pdf_df)
+
         st.download_button(
             label="Descargar historial PDF",
             data=pdf_buffer,
@@ -668,6 +688,7 @@ if paciente_nombre:
                         diferencia = round(ultimo - anterior, 1)
                         texto_cambio = f"{diferencia:+.1f}"
                     else:
+                        diferencia = None
                         texto_cambio = "N/D"
 
                     st.caption(f"Percentil actual: P{round(ultimo, 1)} | Cambio vs anterior: {texto_cambio}")
@@ -701,5 +722,14 @@ if paciente_nombre:
 
                     st.altair_chart(grafico, use_container_width=True)
 
+                    if diferencia is not None:
+                        if diferencia > 0:
+                            st.success(f"↑ Mejora de {diferencia} percentiles desde la evaluación anterior")
+                        elif diferencia < 0:
+                            st.warning(f"↓ Disminución de {abs(diferencia)} percentiles desde la evaluación anterior")
+                        else:
+                            st.info("Sin cambios respecto a la evaluación anterior")
+
     else:
         st.info("Todavía no hay evaluaciones guardadas para este paciente.")
+
