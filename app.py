@@ -129,7 +129,7 @@ TABLA_SILLA = {
 def guardar_evaluacion(paciente, sexo, edad, prueba, valor_medido, percentil, clasificacion):
     payload = {
         "fecha": datetime.now().strftime("%Y-%m-%d"),
-        "paciente": str(paciente).strip(),
+        "paciente": str(paciente_nombre).strip(),,
         "sexo": str(sexo).strip().lower(),
         "edad": int(edad),
         "prueba": str(prueba).strip(),
@@ -414,21 +414,21 @@ def calcular_resultado(prueba, sexo, edad, altura, valor_medido):
 # =========================================================
 st.title("Calculadora de Condición Física")
 
-pacientes_existentes = obtener_pacientes_existentes()
+# obtener pacientes desde Supabase
+resp = supabase.table("pacientes").select("id,nombre").order("nombre").execute()
+pacientes = resp.data
 
-paciente_existente = st.selectbox(
-    "Seleccionar paciente existente (opcional)",
-    options=[""] + pacientes_existentes,
-    index=0
+# lista de nombres
+opciones_pacientes = [p["nombre"] for p in pacientes]
+
+# selector de paciente
+paciente_nombre = st.selectbox(
+    "Seleccionar paciente",
+    opciones_pacientes
 )
 
-paciente_manual = st.text_input(
-    "Nombre del paciente",
-    value=paciente_existente if paciente_existente else "",
-    placeholder="Escribí el nombre del paciente"
-)
-
-paciente = str(paciente_manual).strip()
+# obtener id del paciente
+paciente_id = next(p["id"] for p in pacientes if p["nombre"] == paciente_nombre)
 
 prueba = st.selectbox(
     "Seleccionar prueba",
@@ -537,14 +537,14 @@ st.write(f"**Interpretación clínica:** {interpretacion_clinica(clasificacion)}
 # GUARDADO
 # =========================================================
 if st.button("Guardar evaluación"):
-    if not paciente:
+    if not paciente_nombre:
         st.warning("Ingresá el nombre del paciente antes de guardar.")
     elif percentil is None:
         st.warning("No se pudo calcular el percentil.")
     else:
         try:
             guardar_evaluacion(
-                paciente=paciente,
+                paciente_nombre=paciente_nombre,
                 sexo=sexo,
                 edad=edad,
                 prueba=prueba,
@@ -560,10 +560,10 @@ if st.button("Guardar evaluación"):
 # =========================================================
 # HISTORIAL Y GRAFICOS
 # =========================================================
-if paciente:
+if paciente_nombre:
     st.markdown("### Historial del paciente")
 
-    df_historial = obtener_historial_paciente(paciente)
+    df_historial = obtener_historial_paciente(paciente_nombre)
 
     if not df_historial.empty:
         prueba_filtro = st.selectbox(
@@ -693,6 +693,7 @@ if paciente:
                             st.info("Sin cambios respecto a la evaluación anterior")
     else:
         st.info("Todavía no hay evaluaciones guardadas para este paciente.")
+
 
 
 
