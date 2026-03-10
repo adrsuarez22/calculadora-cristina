@@ -615,29 +615,28 @@ st.markdown(
     <div style="
         background-color:{color};
         color:white;
-        padding:16px;
+        padding:12px;
         border-radius:10px;
         text-align:center;
-        font-size:28px;
-        font-weight:700;
-        margin-top:20px;
-        margin-bottom:15px;
+        font-size:20px;
+        font-weight:600;
+        margin-top:16px;
+        margin-bottom:12px;
     ">
         {clasificacion}
     </div>
     """,
     unsafe_allow_html=True
 )
-
 st.markdown(
     f"""
     <div style="
         background-color:#dff0e6;
         color:#1b5e20;
-        padding:14px;
+        padding:10px 12px;
         border-radius:10px;
-        font-size:22px;
-        margin-bottom:20px;
+        font-size:16px;
+        margin-bottom:16px;
     ">
         Percentil estimado: <b>P{percentil if percentil is not None else "-"}</b>
     </div>
@@ -839,3 +838,4 @@ if paciente_nombre:
                             st.info("Sin cambios respecto a la evaluación anterior")
     else:
         st.info("Todavía no hay evaluaciones guardadas para este paciente.")
+
