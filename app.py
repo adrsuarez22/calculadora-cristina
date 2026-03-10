@@ -538,21 +538,24 @@ ficha = obtener_ficha_paciente(paciente_nombre)
 
 st.markdown("### Ficha del paciente")
 
-with st.container(border=True):
+col_izq, col_centro, col_der = st.columns([1, 2, 1])
 
-    c1, c2 = st.columns(2)
-    c1.write(f"**Nombre:** {ficha['nombre']}")
-    c2.write(f"**Sexo:** {str(ficha['sexo']).capitalize() if ficha['sexo'] != '-' else '-'}")
+with col_centro:
+    with st.container(border=True):
 
-    st.write("")
+        c1, c2 = st.columns(2)
+        c1.write(f"**Nombre:** {ficha['nombre']}")
+        c2.write(f"**Sexo:** {str(ficha['sexo']).capitalize() if ficha['sexo'] != '-' else '-'}")
 
-    c3, c4, c5 = st.columns(3)
-    c3.metric("Evaluaciones", ficha["cantidad_evaluaciones"])
-    c4.metric("Última evaluación", ficha["ultima_fecha"])
-    c5.metric("Última clasificación", ficha["ultima_clasificacion"])
+        st.write("")
 
-    st.write("")
-    st.write(f"**Última prueba registrada:** {ficha['ultima_prueba']}")
+        c3, c4, c5 = st.columns(3)
+        c3.metric("Evaluaciones", ficha["cantidad_evaluaciones"])
+        c4.metric("Última evaluación", ficha["ultima_fecha"])
+        c5.metric("Última clasificación", ficha["ultima_clasificacion"])
+
+        st.write("")
+        st.write(f"**Última prueba registrada:** {ficha['ultima_prueba']}")
 
 st.divider()
 
@@ -857,6 +860,7 @@ if paciente_nombre:
                             st.info("Sin cambios respecto a la evaluación anterior")
     else:
         st.info("Todavía no hay evaluaciones guardadas para este paciente.")
+
 
 
 
