@@ -854,3 +854,6 @@ if paciente_nombre:
                         elif diferencia < 0:
                             st.warning(f"↓ Disminución de {abs(diferencia)} percentiles desde la evaluación anterior")
                         else:
+                            st.info("Sin cambios respecto a la evaluación anterior")
+    else:
+        st.info("Todavía no hay evaluaciones guardadas para este paciente.")
