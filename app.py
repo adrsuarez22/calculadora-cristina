@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import altair as alt
 from datetime import datetime
 from supabase import create_client, Client
 
@@ -544,17 +545,16 @@ if paciente and str(paciente).strip() != "":
             use_container_width=True,
             hide_index=True
         )
+
 # =====================================================
-# GRAFICOS POR PRUEBA
+# GRAFICOS POR PRUEBA CON ETIQUETAS VISIBLES
 # =====================================================
 if "fecha" in df_historial.columns and "percentilo" in df_historial.columns and "prueba" in df_historial.columns:
     df_graf_base = df_historial.copy()
 
     df_graf_base["fecha"] = pd.to_datetime(df_graf_base["fecha"], errors="coerce")
     df_graf_base["percentilo"] = pd.to_numeric(df_graf_base["percentilo"], errors="coerce")
-    df_graf_base["valor_medido"] = pd.to_numeric(df_graf_base["valor_medido"], errors="coerce")
     df_graf_base["prueba"] = df_graf_base["prueba"].astype(str).str.strip()
-    df_graf_base["clasificacion"] = df_graf_base["clasificacion"].astype(str).str.strip()
 
     df_graf_base = df_graf_base.dropna(subset=["fecha", "percentilo", "prueba"])
 
@@ -568,33 +568,39 @@ if "fecha" in df_historial.columns and "percentilo" in df_historial.columns and 
         df_prueba = df_graf_base[df_graf_base["prueba"] == prueba_graf].copy()
 
         if not df_prueba.empty:
-            st.markdown(f"### Evolución del percentil - {prueba_graf}")
-
-            # gráfico
-            df_linea = (
+            # Si hay más de un registro el mismo día para la misma prueba,
+            # se promedia el percentilo para evitar duplicados visuales.
+            df_prueba = (
                 df_prueba.groupby("fecha", as_index=False)["percentilo"]
                 .mean()
                 .sort_values("fecha")
             )
 
-            st.line_chart(
-                df_linea.set_index("fecha")["percentilo"],
-                use_container_width=True
+            df_prueba["Etiqueta"] = df_prueba["percentilo"].apply(lambda x: f"P{round(x,1)}")
+
+            st.markdown(f"### Evolución del percentil - {prueba_graf}")
+
+            linea = alt.Chart(df_prueba).mark_line(point=False).encode(
+                x=alt.X("fecha:T", title="Fecha"),
+                y=alt.Y("percentilo:Q", title="Percentil")
             )
 
-            # detalle visible para móvil
-            st.markdown(f"**Detalle - {prueba_graf}**")
-
-            df_detalle = df_prueba.copy()
-            df_detalle["fecha"] = df_detalle["fecha"].dt.strftime("%Y-%m-%d")
-            df_detalle = df_detalle.sort_values("fecha", ascending=False)
-
-            columnas_detalle = ["fecha", "valor_medido", "percentilo", "clasificacion"]
-            columnas_detalle = [c for c in columnas_detalle if c in df_detalle.columns]
-
-            st.dataframe(
-                df_detalle[columnas_detalle],
-                use_container_width=True,
-                hide_index=True
+            puntos = alt.Chart(df_prueba).mark_circle(size=90).encode(
+                x=alt.X("fecha:T"),
+                y=alt.Y("percentilo:Q")
             )
-       
+
+            etiquetas = alt.Chart(df_prueba).mark_text(
+                dy=-12,
+                fontSize=12
+            ).encode(
+                x=alt.X("fecha:T"),
+                y=alt.Y("percentilo:Q"),
+                text="Etiqueta:N"
+            )
+
+            grafico = (linea + puntos + etiquetas).properties(
+                height=320
+            )
+
+            st.altair_chart(grafico, use_container_width=True)
