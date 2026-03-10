@@ -83,7 +83,7 @@ TABLA_PRENSION = {
         "85-89": {5: 15.9, 10: 18.5, 20: 21.9, 30: 24.6, 40: 27.0, 50: 29.4, 60: 31.8, 70: 34.4, 80: 37.4, 90: 41.5, 95: 44.6},
         "90-94": {5: 13.7, 10: 16.1, 20: 19.2, 30: 21.7, 40: 24.0, 50: 26.3, 60: 28.7, 70: 31.2, 80: 34.2, 90: 38.1, 95: 41.2},
         "95-99": {5: 11.3, 10: 13.5, 20: 16.4, 30: 18.8, 40: 20.9, 50: 23.1, 60: 25.4, 70: 27.9, 80: 30.8, 90: 34.6, 95: 37.5},
-        "+100":  {5: 8.8, 10: 10.8, 20: 13.5, 30: 15.7, 40: 17.8, 50: 19.8, 60: 22.0, 70: 24.5, 80: 27.2, 90: 30.9, 95: 33.8},
+        "+100": {5: 8.8, 10: 10.8, 20: 13.5, 30: 15.7, 40: 17.8, 50: 19.8, 60: 22.0, 70: 24.5, 80: 27.2, 90: 30.9, 95: 33.8},
     },
     "Mujer": {
         "20-24": {5: 19.7, 10: 21.7, 20: 24.0, 30: 25.7, 40: 27.2, 50: 28.6, 60: 30.0, 70: 31.6, 80: 33.6, 90: 36.6, 95: 39.1},
@@ -102,7 +102,7 @@ TABLA_PRENSION = {
         "85-89": {5: 9.3, 10: 11.4, 20: 13.9, 30: 15.7, 40: 17.2, 50: 18.6, 60: 20.0, 70: 21.5, 80: 23.3, 90: 25.9, 95: 28.0},
         "90-94": {5: 7.8, 10: 9.8, 20: 12.2, 30: 13.9, 40: 15.3, 50: 16.7, 60: 18.0, 70: 19.5, 80: 21.2, 90: 23.6, 95: 25.7},
         "95-99": {5: 6.1, 10: 8.0, 20: 10.3, 30: 11.9, 40: 13.3, 50: 14.6, 60: 15.9, 70: 17.3, 80: 18.9, 90: 21.2, 95: 23.2},
-        "+100":  {5: 4.2, 10: 6.1, 20: 8.3, 30: 9.8, 40: 11.2, 50: 12.4, 60: 13.6, 70: 14.9, 80: 16.5, 90: 18.7, 95: 20.6},
+        "+100": {5: 4.2, 10: 6.1, 20: 8.3, 30: 9.8, 40: 11.2, 50: 12.4, 60: 13.6, 70: 14.9, 80: 16.5, 90: 18.7, 95: 20.6},
     }
 }
 
@@ -112,14 +112,14 @@ TABLA_SILLA = {
         "70-74": {10: 11, 20: 13, 30: 14, 40: 15, 50: 15, 60: 16, 70: 17, 80: 18, 90: 20, 100: 29},
         "75-79": {10: 10, 20: 12, 30: 13, 40: 14, 50: 14, 60: 15, 70: 16, 80: 17, 90: 19, 100: 25},
         "80-84": {10: 9, 20: 10, 30: 11, 40: 12, 50: 14, 60: 15, 70: 16, 80: 17, 90: 18, 100: 22},
-        "+84":   {10: 9, 20: 9, 30: 12, 40: 13, 50: 14, 60: 14, 70: 16, 80: 18, 90: 20, 100: 21},
+        "+84": {10: 9, 20: 9, 30: 12, 40: 13, 50: 14, 60: 14, 70: 16, 80: 18, 90: 20, 100: 21},
     },
     "Mujer": {
         "65-69": {10: 11, 20: 12, 30: 13, 40: 14, 50: 15, 60: 15, 70: 16, 80: 17, 90: 19, 100: 30},
         "70-74": {10: 10, 20: 12, 30: 12, 40: 13, 50: 14, 60: 15, 70: 16, 80: 17, 90: 19, 100: 27},
         "75-79": {10: 10, 20: 11, 30: 12, 40: 13, 50: 14, 60: 14, 70: 15, 80: 16, 90: 18, 100: 24},
         "80-84": {10: 9, 20: 10, 30: 11, 40: 12, 50: 13, 60: 14, 70: 15, 80: 16, 90: 18, 100: 24},
-        "+84":   {10: 6, 20: 8, 30: 9, 40: 11, 50: 12, 60: 14, 70: 14, 80: 16, 90: 17, 100: 18},
+        "+84": {10: 6, 20: 8, 30: 9, 40: 11, 50: 12, 60: 14, 70: 14, 80: 16, 90: 17, 100: 18},
     }
 }
 
@@ -139,8 +139,29 @@ def guardar_evaluacion(paciente_nombre, sexo, edad, prueba, valor_medido, percen
     }
     return supabase.table("evaluaciones").insert(payload).execute()
 
-def generar_pdf_historial(paciente, df):
 
+def guardar_paciente(nombre, sexo):
+    nombre_limpio = str(nombre).strip()
+    sexo_limpio = str(sexo).strip().lower()
+
+    if not nombre_limpio:
+        raise ValueError("El nombre del paciente está vacío.")
+
+    respuesta = supabase.table("pacientes").select("id,nombre").execute()
+    existentes = respuesta.data if respuesta.data else []
+
+    for p in existentes:
+        if str(p["nombre"]).strip().lower() == nombre_limpio.lower():
+            raise ValueError("Ese paciente ya existe.")
+
+    payload = {
+        "nombre": nombre_limpio,
+        "sexo": sexo_limpio
+    }
+    return supabase.table("pacientes").insert(payload).execute()
+
+
+def generar_pdf_historial(paciente, df):
     buffer = BytesIO()
     pdf = canvas.Canvas(buffer, pagesize=letter)
 
@@ -164,11 +185,9 @@ def generar_pdf_historial(paciente, df):
     pdf.drawString(440, y, "Clasificación")
 
     y -= 20
-
     pdf.setFont("Helvetica", 10)
 
     for _, row in df.iterrows():
-
         pdf.drawString(50, y, str(row["fecha"]))
         pdf.drawString(130, y, str(row["prueba"]))
         pdf.drawString(300, y, str(row["valor_medido"]))
@@ -187,6 +206,7 @@ def generar_pdf_historial(paciente, df):
 
     return buffer
 
+
 def obtener_historial_paciente(paciente):
     try:
         respuesta = (
@@ -204,28 +224,12 @@ def obtener_historial_paciente(paciente):
         return pd.DataFrame()
 
 
-def obtener_pacientes_existentes():
+def obtener_pacientes():
     try:
-        respuesta = supabase.table("evaluaciones").select("paciente").execute()
-        if not respuesta.data:
-            return []
-
-        df = pd.DataFrame(respuesta.data)
-        if "paciente" not in df.columns:
-            return []
-
-        return (
-            df["paciente"]
-            .dropna()
-            .astype(str)
-            .str.strip()
-            .replace("", pd.NA)
-            .dropna()
-            .drop_duplicates()
-            .sort_values()
-            .tolist()
-        )
-    except Exception:
+        respuesta = supabase.table("pacientes").select("id,nombre,sexo").order("nombre").execute()
+        return respuesta.data if respuesta.data else []
+    except Exception as e:
+        st.error(f"Error al leer pacientes: {e}")
         return []
 
 
@@ -414,28 +418,44 @@ def calcular_resultado(prueba, sexo, edad, altura, valor_medido):
 # =========================================================
 st.title("Calculadora de Condición Física")
 
-# obtener pacientes desde Supabase
-resp = supabase.table("pacientes").select("id,nombre").order("nombre").execute()
-pacientes = resp.data
+with st.expander("➕ Nuevo paciente"):
+    nuevo_nombre = st.text_input("Nombre del nuevo paciente", key="nuevo_nombre")
+    nuevo_sexo = st.selectbox("Sexo del nuevo paciente", ["hombre", "mujer"], key="nuevo_sexo")
 
-# lista de nombres
+    if st.button("Guardar paciente", key="btn_guardar_paciente"):
+        if not nuevo_nombre.strip():
+            st.warning("Ingresá el nombre del paciente.")
+        else:
+            try:
+                guardar_paciente(nuevo_nombre, nuevo_sexo)
+                st.success("Paciente agregado correctamente.")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Error al guardar paciente: {e}")
+
+pacientes = obtener_pacientes()
 opciones_pacientes = [p["nombre"] for p in pacientes]
 
-# selector de paciente
-paciente_nombre = st.selectbox(
-    "Seleccionar paciente",
-    opciones_pacientes
-)
+if not opciones_pacientes:
+    st.warning("No hay pacientes cargados. Agregá uno desde '➕ Nuevo paciente'.")
+    st.stop()
 
-# obtener id del paciente
-paciente_id = next(p["id"] for p in pacientes if p["nombre"] == paciente_nombre)
+paciente_nombre = st.selectbox("Seleccionar paciente", opciones_pacientes)
+
+paciente_sexo_guardado = next((p["sexo"] for p in pacientes if p["nombre"] == paciente_nombre), None)
 
 prueba = st.selectbox(
     "Seleccionar prueba",
     ["Caminata 6 minutos", "Prensión manual", "Levantarse de la silla"]
 )
 
-sexo = st.selectbox("Sexo", ["Hombre", "Mujer"])
+sexo_default = "Hombre"
+if paciente_sexo_guardado == "mujer":
+    sexo_default = "Mujer"
+elif paciente_sexo_guardado == "hombre":
+    sexo_default = "Hombre"
+
+sexo = st.selectbox("Sexo", ["Hombre", "Mujer"], index=0 if sexo_default == "Hombre" else 1)
 
 altura = None
 valor_medido = None
@@ -538,7 +558,7 @@ st.write(f"**Interpretación clínica:** {interpretacion_clinica(clasificacion)}
 # =========================================================
 if st.button("Guardar evaluación"):
     if not paciente_nombre:
-        st.warning("Ingresá el nombre del paciente antes de guardar.")
+        st.warning("Seleccioná un paciente antes de guardar.")
     elif percentil is None:
         st.warning("No se pudo calcular el percentil.")
     else:
@@ -568,7 +588,7 @@ if paciente_nombre:
     if not df_historial.empty:
         prueba_filtro = st.selectbox(
             "Filtrar historial por prueba",
-            options=["Todas"] + ["Caminata 6 minutos", "Prensión manual", "Levantarse de la silla"],
+            options=["Todas", "Caminata 6 minutos", "Prensión manual", "Levantarse de la silla"],
             index=0
         )
 
@@ -589,15 +609,13 @@ if paciente_nombre:
                 errors="coerce"
             ).dt.strftime("%Y-%m-%d")
 
-            st.dataframe(
+        st.dataframe(
             df_historial_mostrar.sort_values(by="fecha", ascending=False),
             use_container_width=True,
             hide_index=True
         )
 
-        # ---- Descargar CSV ----
         csv_historial = df_historial_mostrar.to_csv(index=False).encode("utf-8")
-
         st.download_button(
             label="Descargar historial CSV",
             data=csv_historial,
@@ -605,12 +623,11 @@ if paciente_nombre:
             mime="text/csv"
         )
 
-        # ---- Descargar PDF ----
         pdf_buffer = generar_pdf_historial(paciente_nombre, df_historial_mostrar)
         st.download_button(
             label="Descargar historial PDF",
             data=pdf_buffer,
-            file_name=f"historial_{paciente_nombre}.pdf",
+            file_name=f"historial_{paciente_nombre.replace(' ', '_')}.pdf",
             mime="application/pdf"
         )
 
@@ -683,26 +700,6 @@ if paciente_nombre:
                     grafico = (linea + puntos + etiquetas).properties(height=260)
 
                     st.altair_chart(grafico, use_container_width=True)
-                    if len(df_prueba) >= 2:
-                        if diferencia > 0:
-                            st.success(f"↑ Mejora de {diferencia} percentiles desde la evaluación anterior")
-                        elif diferencia < 0:
-                            st.warning(f"↓ Disminución de {abs(diferencia)} percentiles desde la evaluación anterior")
-                        else:
-                            st.info("Sin cambios respecto a la evaluación anterior")
+
     else:
         st.info("Todavía no hay evaluaciones guardadas para este paciente.")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
