@@ -539,40 +539,22 @@ ficha = obtener_ficha_paciente(paciente_nombre)
 st.markdown("### Ficha del paciente")
 
 with st.container(border=True):
-    col1, col2 = st.columns(2)
+    c1, c2, c3 = st.columns([1.4, 1, 1])
 
-    with col1:
-        st.write(f"**Paciente**")
-        st.write(ficha["nombre"])
+    with c1:
+        st.write(f"**Paciente:** {ficha['nombre']}")
+        st.write(f"**Sexo:** {str(ficha['sexo']).capitalize() if ficha['sexo'] != '-' else '-'}")
 
-    with col2:
-        st.write(f"**Sexo**")
-        st.write(str(ficha["sexo"]).capitalize() if ficha["sexo"] != "-" else "-")
+    with c2:
+        st.write(f"**Evaluaciones:** {ficha['cantidad_evaluaciones']}")
+        st.write(f"**Última evaluación:** {ficha['ultima_fecha']}")
 
-    st.write("")
+    with c3:
+        st.write(f"**Última clasificación:** {ficha['ultima_clasificacion']}")
+        st.write(f"**Última prueba:** {ficha['ultima_prueba']}")
 
-    col3, col4 = st.columns(2)
-
-    with col3:
-        st.write("**Evaluaciones**")
-        st.write(str(ficha["cantidad_evaluaciones"]))
-
-    with col4:
-        st.write("**Última evaluación**")
-        st.write(ficha["ultima_fecha"])
-
-        st.write("")
-
-    col5, col6 = st.columns(2)
-
-    with col5:
-        st.write("**Última clasificación**")
-        st.write(ficha["ultima_clasificacion"])
-
-    with col6:
-        st.write("**Última prueba registrada**")
-        st.write(ficha["ultima_prueba"])
 st.divider()
+
 paciente_sexo_guardado = next((p["sexo"] for p in pacientes if p["nombre"] == paciente_nombre), None)
 
 prueba = st.selectbox(
@@ -874,6 +856,7 @@ if paciente_nombre:
                             st.info("Sin cambios respecto a la evaluación anterior")
     else:
         st.info("Todavía no hay evaluaciones guardadas para este paciente.")
+
 
 
 
