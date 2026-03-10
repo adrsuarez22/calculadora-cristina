@@ -589,7 +589,7 @@ if paciente:
                 errors="coerce"
             ).dt.strftime("%Y-%m-%d")
 
-                st.dataframe(
+            st.dataframe(
             df_historial_mostrar.sort_values(by="fecha", ascending=False),
             use_container_width=True,
             hide_index=True
@@ -693,6 +693,7 @@ if paciente:
                             st.info("Sin cambios respecto a la evaluación anterior")
     else:
         st.info("Todavía no hay evaluaciones guardadas para este paciente.")
+
 
 
 
