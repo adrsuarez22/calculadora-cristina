@@ -124,7 +124,7 @@ TABLA_SILLA = {
 }
 
 # =========================================================
-# UTILIDADES
+# UTILIDADES BASE DE DATOS
 # =========================================================
 def guardar_evaluacion(paciente_nombre, sexo, edad, prueba, valor_medido, percentil, clasificacion):
     payload = {
@@ -163,52 +163,6 @@ def guardar_paciente(nombre, sexo):
 
 def eliminar_evaluacion(id_registro):
     return supabase.table("evaluaciones").delete().eq("id", id_registro).execute()
-
-
-def generar_pdf_historial(paciente, df):
-    buffer = BytesIO()
-    pdf = canvas.Canvas(buffer, pagesize=letter)
-
-    y = 750
-
-    pdf.setFont("Helvetica-Bold", 16)
-    pdf.drawString(50, y, "Historial de condición física")
-
-    y -= 30
-
-    pdf.setFont("Helvetica", 12)
-    pdf.drawString(50, y, f"Paciente: {paciente}")
-
-    y -= 40
-
-    pdf.setFont("Helvetica-Bold", 11)
-    pdf.drawString(50, y, "Fecha")
-    pdf.drawString(130, y, "Prueba")
-    pdf.drawString(300, y, "Valor")
-    pdf.drawString(360, y, "Percentil")
-    pdf.drawString(440, y, "Clasificación")
-
-    y -= 20
-    pdf.setFont("Helvetica", 10)
-
-    for _, row in df.iterrows():
-        pdf.drawString(50, y, str(row.get("fecha", "")))
-        pdf.drawString(130, y, str(row.get("prueba", "")))
-        pdf.drawString(300, y, str(row.get("valor_medido", "")))
-        pdf.drawString(360, y, str(row.get("percentil", "")))
-        pdf.drawString(440, y, str(row.get("clasificacion", "")))
-
-        y -= 18
-
-        if y < 100:
-            pdf.showPage()
-            pdf.setFont("Helvetica", 10)
-            y = 750
-
-    pdf.save()
-    buffer.seek(0)
-
-    return buffer
 
 
 def obtener_historial_paciente(paciente):
@@ -299,6 +253,55 @@ def obtener_ficha_paciente(paciente_nombre):
         }
 
 
+def generar_pdf_historial(paciente, df):
+    buffer = BytesIO()
+    pdf = canvas.Canvas(buffer, pagesize=letter)
+
+    y = 750
+
+    pdf.setFont("Helvetica-Bold", 16)
+    pdf.drawString(50, y, "Historial de condición física")
+
+    y -= 30
+
+    pdf.setFont("Helvetica", 12)
+    pdf.drawString(50, y, f"Paciente: {paciente}")
+
+    y -= 40
+
+    pdf.setFont("Helvetica-Bold", 11)
+    pdf.drawString(50, y, "Fecha")
+    pdf.drawString(130, y, "Prueba")
+    pdf.drawString(300, y, "Valor")
+    pdf.drawString(360, y, "Percentil")
+    pdf.drawString(440, y, "Clasificación")
+
+    y -= 20
+    pdf.setFont("Helvetica", 10)
+
+    for _, row in df.iterrows():
+        pdf.drawString(50, y, str(row.get("fecha", "")))
+        pdf.drawString(130, y, str(row.get("prueba", "")))
+        pdf.drawString(300, y, str(row.get("valor_medido", "")))
+        pdf.drawString(360, y, str(row.get("percentil", "")))
+        pdf.drawString(440, y, str(row.get("clasificacion", "")))
+
+        y -= 18
+
+        if y < 100:
+            pdf.showPage()
+            pdf.setFont("Helvetica", 10)
+            y = 750
+
+    pdf.save()
+    buffer.seek(0)
+
+    return buffer
+
+
+# =========================================================
+# UTILIDADES CLÍNICAS
+# =========================================================
 def clasificar_percentil(percentil):
     if percentil is None:
         return "Sin clasificar"
@@ -484,20 +487,6 @@ def calcular_resultado(prueba, sexo, edad, altura, valor_medido):
 # UI
 # =========================================================
 st.title("Calculadora de Condición Física")
-st.markdown("""
-<style>
-div[data-testid="stMetricValue"] {
-    font-size: 1.35rem !important;
-}
-div[data-testid="stMetricLabel"] {
-    font-size: 0.80rem !important;
-}
-div[data-testid="stMetric"] {
-    padding-top: 0.2rem !important;
-    padding-bottom: 0.2rem !important;
-}
-</style>
-""", unsafe_allow_html=True)
 
 with st.expander("➕ Nuevo paciente"):
     nuevo_nombre = st.text_input("Nombre del nuevo paciente", key="nuevo_nombre_alta")
@@ -539,23 +528,25 @@ ficha = obtener_ficha_paciente(paciente_nombre)
 st.markdown("### Ficha del paciente")
 
 with st.container(border=True):
+    col1, col2, col3 = st.columns([1.4, 1, 1])
 
-    c1, c2 = st.columns(2)
-    c1.write(f"**Nombre:** {ficha['nombre']}")
-    c2.write(f"**Sexo:** {str(ficha['sexo']).capitalize() if ficha['sexo'] != '-' else '-'}")
+    with col1:
+        st.write(f"**Nombre:** {ficha['nombre']}")
+        st.write(f"**Sexo:** {str(ficha['sexo']).capitalize() if ficha['sexo'] != '-' else '-'}")
 
-    st.write("")
+    with col2:
+        st.write(f"**Evaluaciones:** {ficha['cantidad_evaluaciones']}")
+        st.write(f"**Última evaluación:** {ficha['ultima_fecha']}")
 
-    c3, c4, c5 = st.columns(3)
-    c3.metric("Evaluaciones", ficha["cantidad_evaluaciones"])
-    c4.metric("Última evaluación", ficha["ultima_fecha"])
-    c5.metric("Última clasificación", ficha["ultima_clasificacion"])
-
-    st.write("")
-    st.write(f"**Última prueba registrada:** {ficha['ultima_prueba']}")
+    with col3:
+        st.write(f"**Última clasificación:** {ficha['ultima_clasificacion']}")
+        st.write(f"**Última prueba:** {ficha['ultima_prueba']}")
 
 st.divider()
 
+# =========================================================
+# FORMULARIO
+# =========================================================
 paciente_sexo_guardado = next((p["sexo"] for p in pacientes if p["nombre"] == paciente_nombre), None)
 
 prueba = st.selectbox(
@@ -648,6 +639,7 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
 st.markdown(
     f"""
     <div style="
@@ -663,6 +655,7 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
 st.write(f"**Rango percentilar:** {rango_percentilar(percentil)}")
 st.write(f"**Referencia P50:** {referencia_p50}")
 
@@ -759,36 +752,28 @@ if paciente_nombre:
             .encode("utf-8")
         )
 
-        st.download_button(
-            label="Descargar historial CSV",
-            data=csv_historial,
-            file_name=f"historial_{paciente_nombre.replace(' ', '_')}.csv",
-            mime="text/csv",
-            key="btn_descargar_csv"
-        )
+        pdf_df = df_historial_mostrar.drop(columns=["id"], errors="ignore").copy()
+        pdf_buffer = generar_pdf_historial(paciente_nombre, pdf_df)
 
-       pdf_df = df_historial_mostrar.drop(columns=["id"], errors="ignore").copy()
-pdf_buffer = generar_pdf_historial(paciente_nombre, pdf_df)
+        col_csv, col_pdf = st.columns(2)
 
-col_csv, col_pdf = st.columns(2)
+        with col_csv:
+            st.download_button(
+                label="Descargar historial CSV",
+                data=csv_historial,
+                file_name=f"historial_{paciente_nombre.replace(' ', '_')}.csv",
+                mime="text/csv",
+                key="btn_descargar_csv"
+            )
 
-with col_csv:
-    st.download_button(
-        label="Descargar historial CSV",
-        data=csv_historial,
-        file_name=f"historial_{paciente_nombre.replace(' ', '_')}.csv",
-        mime="text/csv",
-        key="btn_descargar_csv"
-    )
-
-with col_pdf:
-    st.download_button(
-        label="Descargar historial PDF",
-        data=pdf_buffer,
-        file_name=f"historial_{paciente_nombre.replace(' ', '_')}.pdf",
-        mime="application/pdf",
-        key="btn_descargar_pdf"
-    )
+        with col_pdf:
+            st.download_button(
+                label="Descargar historial PDF",
+                data=pdf_buffer,
+                file_name=f"historial_{paciente_nombre.replace(' ', '_')}.pdf",
+                mime="application/pdf",
+                key="btn_descargar_pdf"
+            )
 
         if {"fecha", "percentil", "prueba"}.issubset(df_historial.columns):
             df_graf_base = df_historial.copy()
@@ -830,8 +815,11 @@ with col_pdf:
                         diferencia = None
                         texto_cambio = "N/D"
 
-                    st.caption(f"Percentil actual: P{round(ultimo, 1)} | Cambio vs anterior: {texto_cambio}")
                     st.markdown(f"### Evolución del percentil - {prueba_graf}")
+                    st.caption(
+                        f"Percentil actual: P{round(ultimo, 1)} | "
+                        f"Cambio respecto de la evaluación anterior: {texto_cambio}"
+                    )
 
                     linea = alt.Chart(df_prueba).mark_line(point=False).encode(
                         x=alt.X(
@@ -869,4 +857,3 @@ with col_pdf:
                             st.info("Sin cambios respecto a la evaluación anterior")
     else:
         st.info("Todavía no hay evaluaciones guardadas para este paciente.")
-
