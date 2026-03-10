@@ -571,10 +571,10 @@ if paciente:
             if prueba_filtro != "Todas":
                 pruebas_orden = [prueba_filtro]
 
-            for prueba_graf in pruebas_orden:
+                        for prueba_graf in pruebas_orden:
                 df_prueba = df_graf_base[df_graf_base["prueba"] == prueba_graf].copy()
 
-                               if not df_prueba.empty:
+                if not df_prueba.empty:
                     df_prueba = (
                         df_prueba.groupby("fecha", as_index=False)["percentil"]
                         .mean()
@@ -597,7 +597,11 @@ if paciente:
                     st.markdown(f"### Evolución del percentil - {prueba_graf}")
 
                     linea = alt.Chart(df_prueba).mark_line(point=False).encode(
-                        x=alt.X("yearmonthdate(fecha):T", title="Fecha", axis=alt.Axis(format="%d-%m-%Y")),
+                        x=alt.X(
+                            "yearmonthdate(fecha):T",
+                            title="Fecha",
+                            axis=alt.Axis(format="%d-%m-%Y")
+                        ),
                         y=alt.Y("percentil:Q", title="Percentil")
                     )
 
@@ -618,7 +622,6 @@ if paciente:
                     grafico = (linea + puntos + etiquetas).properties(height=260)
 
                     st.altair_chart(grafico, use_container_width=True)
-
                     if len(df_prueba) >= 2:
                         if diferencia > 0:
                             st.success(f"↑ Mejora de {diferencia} percentiles desde la evaluación anterior")
@@ -628,6 +631,7 @@ if paciente:
                             st.info("Sin cambios respecto a la evaluación anterior")
     else:
         st.info("Todavía no hay evaluaciones guardadas para este paciente.")
+
 
 
 
