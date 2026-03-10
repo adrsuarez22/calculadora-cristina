@@ -585,19 +585,15 @@ if paciente:
 
                     ultimo = df_prueba["percentil"].iloc[-1]
 
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        st.metric("Percentil actual", f"P{round(ultimo, 1)}")
-
-                    if len(df_prueba) >= 2:
-                        anterior = df_prueba["percentil"].iloc[-2]
-                        diferencia = round(ultimo - anterior, 1)
-                        with col2:
-                            st.metric("Cambio vs anterior", f"{diferencia:+.1f}")
+                if len(df_prueba) >= 2:
+                    anterior = df_prueba["percentil"].iloc[-2]
+                    diferencia = round(ultimo - anterior, 1)
+                    texto_cambio = f"{diferencia:+.1f}"
                     else:
-                        with col2:
-                            st.metric("Cambio vs anterior", "N/D")
+                    texto_cambio = "N/D"
 
+                    st.caption(f"Percentil actual: P{round(ultimo, 1)} | Cambio vs anterior: {texto_cambio}")
+                
                     st.markdown(f"### Evolución del percentil - {prueba_graf}")
 
                     linea = alt.Chart(df_prueba).mark_line(point=False).encode(
@@ -632,3 +628,4 @@ if paciente:
                             st.info("Sin cambios respecto a la evaluación anterior")
     else:
         st.info("Todavía no hay evaluaciones guardadas para este paciente.")
+
