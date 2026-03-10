@@ -126,10 +126,10 @@ TABLA_SILLA = {
 # =========================================================
 # UTILIDADES
 # =========================================================
-def guardar_evaluacion(paciente, sexo, edad, prueba, valor_medido, percentil, clasificacion):
+def guardar_evaluacion(paciente_nombre, sexo, edad, prueba, valor_medido, percentil, clasificacion):
     payload = {
         "fecha": datetime.now().strftime("%Y-%m-%d"),
-        "paciente": str(paciente_nombre).strip(),,
+        "paciente": str(paciente_nombre).strip(),
         "sexo": str(sexo).strip().lower(),
         "edad": int(edad),
         "prueba": str(prueba).strip(),
@@ -693,6 +693,7 @@ if paciente_nombre:
                             st.info("Sin cambios respecto a la evaluación anterior")
     else:
         st.info("Todavía no hay evaluaciones guardadas para este paciente.")
+
 
 
 
