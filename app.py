@@ -544,41 +544,57 @@ if paciente and str(paciente).strip() != "":
             use_container_width=True,
             hide_index=True
         )
+# =====================================================
+# GRAFICOS POR PRUEBA
+# =====================================================
+if "fecha" in df_historial.columns and "percentilo" in df_historial.columns and "prueba" in df_historial.columns:
+    df_graf_base = df_historial.copy()
 
-        # =====================================================
-        # GRAFICOS POR PRUEBA
-        # =====================================================
-        if "fecha" in df_historial.columns and "percentilo" in df_historial.columns and "prueba" in df_historial.columns:
-            df_graf_base = df_historial.copy()
+    df_graf_base["fecha"] = pd.to_datetime(df_graf_base["fecha"], errors="coerce")
+    df_graf_base["percentilo"] = pd.to_numeric(df_graf_base["percentilo"], errors="coerce")
+    df_graf_base["valor_medido"] = pd.to_numeric(df_graf_base["valor_medido"], errors="coerce")
+    df_graf_base["prueba"] = df_graf_base["prueba"].astype(str).str.strip()
+    df_graf_base["clasificacion"] = df_graf_base["clasificacion"].astype(str).str.strip()
 
-            df_graf_base["fecha"] = pd.to_datetime(df_graf_base["fecha"], errors="coerce")
-            df_graf_base["percentilo"] = pd.to_numeric(df_graf_base["percentilo"], errors="coerce")
-            df_graf_base["prueba"] = df_graf_base["prueba"].astype(str).str.strip()
+    df_graf_base = df_graf_base.dropna(subset=["fecha", "percentilo", "prueba"])
 
-            df_graf_base = df_graf_base.dropna(subset=["fecha", "percentilo", "prueba"])
+    pruebas_orden = [
+        "Caminata 6 minutos",
+        "Prensión manual",
+        "Levantarse de la silla"
+    ]
 
-            pruebas_orden = [
-                "Caminata 6 minutos",
-                "Prensión manual",
-                "Levantarse de la silla"
-            ]
+    for prueba_graf in pruebas_orden:
+        df_prueba = df_graf_base[df_graf_base["prueba"] == prueba_graf].copy()
 
-            for prueba_graf in pruebas_orden:
-                df_prueba = df_graf_base[df_graf_base["prueba"] == prueba_graf].copy()
+        if not df_prueba.empty:
+            st.markdown(f"### Evolución del percentil - {prueba_graf}")
 
-                if not df_prueba.empty:
-                    # Si hay más de un registro el mismo día para la misma prueba,
-                    # promediamos el percentilo para evitar líneas verticales.
-                    df_prueba = (
-                        df_prueba.groupby("fecha", as_index=False)["percentilo"]
-                        .mean()
-                        .sort_values("fecha")
-                    )
+            # gráfico
+            df_linea = (
+                df_prueba.groupby("fecha", as_index=False)["percentilo"]
+                .mean()
+                .sort_values("fecha")
+            )
 
-                    st.markdown(f"### Evolución del percentil - {prueba_graf}")
-                    st.line_chart(
-                        df_prueba.set_index("fecha")["percentilo"],
-                        use_container_width=True
-                    )
-    else:
-        st.info("Todavía no hay evaluaciones guardadas para este paciente.")
+            st.line_chart(
+                df_linea.set_index("fecha")["percentilo"],
+                use_container_width=True
+            )
+
+            # detalle visible para móvil
+            st.markdown(f"**Detalle - {prueba_graf}**")
+
+            df_detalle = df_prueba.copy()
+            df_detalle["fecha"] = df_detalle["fecha"].dt.strftime("%Y-%m-%d")
+            df_detalle = df_detalle.sort_values("fecha", ascending=False)
+
+            columnas_detalle = ["fecha", "valor_medido", "percentilo", "clasificacion"]
+            columnas_detalle = [c for c in columnas_detalle if c in df_detalle.columns]
+
+            st.dataframe(
+                df_detalle[columnas_detalle],
+                use_container_width=True,
+                hide_index=True
+            )
+       
