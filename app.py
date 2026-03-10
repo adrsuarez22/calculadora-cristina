@@ -539,19 +539,20 @@ ficha = obtener_ficha_paciente(paciente_nombre)
 st.markdown("### Ficha del paciente")
 
 with st.container(border=True):
-    c1, c2, c3 = st.columns([1.4, 1, 1])
 
-    with c1:
-        st.write(f"**Paciente:** {ficha['nombre']}")
-        st.write(f"**Sexo:** {str(ficha['sexo']).capitalize() if ficha['sexo'] != '-' else '-'}")
+    c1, c2 = st.columns(2)
+    c1.write(f"**Nombre:** {ficha['nombre']}")
+    c2.write(f"**Sexo:** {str(ficha['sexo']).capitalize() if ficha['sexo'] != '-' else '-'}")
 
-    with c2:
-        st.write(f"**Evaluaciones:** {ficha['cantidad_evaluaciones']}")
-        st.write(f"**Última evaluación:** {ficha['ultima_fecha']}")
+    st.write("")
 
-    with c3:
-        st.write(f"**Última clasificación:** {ficha['ultima_clasificacion']}")
-        st.write(f"**Última prueba:** {ficha['ultima_prueba']}")
+    c3, c4, c5 = st.columns(3)
+    c3.metric("Evaluaciones", ficha["cantidad_evaluaciones"])
+    c4.metric("Última evaluación", ficha["ultima_fecha"])
+    c5.metric("Última clasificación", ficha["ultima_clasificacion"])
+
+    st.write("")
+    st.write(f"**Última prueba registrada:** {ficha['ultima_prueba']}")
 
 st.divider()
 
@@ -853,18 +854,3 @@ if paciente_nombre:
                         elif diferencia < 0:
                             st.warning(f"↓ Disminución de {abs(diferencia)} percentiles desde la evaluación anterior")
                         else:
-                            st.info("Sin cambios respecto a la evaluación anterior")
-    else:
-        st.info("Todavía no hay evaluaciones guardadas para este paciente.")
-
-
-
-
-
-
-
-
-
-
-
-
