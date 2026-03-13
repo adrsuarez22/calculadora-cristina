@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import altair as alt
-from datetime import datetime, date
+from datetime import datetime
 from supabase import create_client, Client
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
@@ -31,7 +31,6 @@ st.markdown("""
 }
 </style>
 """, unsafe_allow_html=True)
-
 # =========================================================
 # SUPABASE
 # =========================================================
@@ -156,15 +155,12 @@ def guardar_evaluacion(paciente_nombre, sexo, edad, prueba, valor_medido, percen
     return supabase.table("evaluaciones").insert(payload).execute()
 
 
-def guardar_paciente(nombre, sexo, talla_m):
+def guardar_paciente(nombre, sexo):
     nombre_limpio = str(nombre).strip()
     sexo_limpio = str(sexo).strip().lower()
 
     if not nombre_limpio:
         raise ValueError("El nombre del paciente está vacío.")
-
-    if talla_m is None or float(talla_m) <= 0:
-        raise ValueError("La talla debe ser mayor a 0.")
 
     respuesta = supabase.table("pacientes").select("id,nombre").execute()
     existentes = respuesta.data if respuesta.data else []
@@ -175,32 +171,9 @@ def guardar_paciente(nombre, sexo, talla_m):
 
     payload = {
         "nombre": nombre_limpio,
-        "sexo": sexo_limpio,
-        "talla_m": round(float(talla_m), 2)
+        "sexo": sexo_limpio
     }
     return supabase.table("pacientes").insert(payload).execute()
-
-
-def guardar_peso(paciente_id, fecha_medicion, peso_kg, talla_m):
-    if paciente_id is None:
-        raise ValueError("No se encontró el id del paciente.")
-
-    if talla_m is None or float(talla_m) <= 0:
-        raise ValueError("El paciente no tiene una talla válida cargada.")
-
-    if peso_kg is None or float(peso_kg) <= 0:
-        raise ValueError("El peso debe ser mayor a 0.")
-
-    imc = round(float(peso_kg) / (float(talla_m) ** 2), 2)
-
-    payload = {
-        "paciente_id": int(paciente_id),
-        "fecha": str(fecha_medicion),
-        "peso_kg": float(peso_kg),
-        "imc": imc
-    }
-
-    return supabase.table("seguimiento_peso").insert(payload).execute()
 
 
 def eliminar_evaluacion(id_registro):
@@ -224,30 +197,11 @@ def obtener_historial_paciente(paciente):
         return pd.DataFrame()
 
 
-def obtener_historial_peso(paciente_id):
-    try:
-        respuesta = (
-            supabase.table("seguimiento_peso")
-            .select("id,paciente_id,fecha,peso_kg,imc,created_at")
-            .eq("paciente_id", int(paciente_id))
-            .order("fecha")
-            .execute()
-        )
-
-        if respuesta.data:
-            return pd.DataFrame(respuesta.data)
-
-        return pd.DataFrame(columns=["fecha", "peso_kg", "imc"])
-    except Exception as e:
-        st.error(f"Error al leer historial de peso: {e}")
-        return pd.DataFrame(columns=["fecha", "peso_kg", "imc"])
-
-
 def obtener_pacientes():
     try:
         respuesta = (
             supabase.table("pacientes")
-            .select("id,nombre,sexo,talla_m")
+            .select("id,nombre,sexo")
             .order("nombre")
             .execute()
         )
@@ -263,7 +217,7 @@ def obtener_ficha_paciente(paciente_nombre):
 
         respuesta_paciente = (
             supabase.table("pacientes")
-            .select("id,nombre,sexo,talla_m,created_at")
+            .select("nombre, sexo, created_at")
             .eq("nombre", paciente_nombre)
             .limit(1)
             .execute()
@@ -294,10 +248,8 @@ def obtener_ficha_paciente(paciente_nombre):
                 ultima_prueba = str(df_historial.iloc[0]["prueba"])
 
         return {
-            "id": datos_paciente.get("id"),
             "nombre": datos_paciente.get("nombre", paciente_nombre),
             "sexo": datos_paciente.get("sexo", "-"),
-            "talla_m": datos_paciente.get("talla_m"),
             "cantidad_evaluaciones": cantidad_evaluaciones,
             "ultima_fecha": ultima_fecha,
             "ultima_clasificacion": ultima_clasificacion,
@@ -307,10 +259,8 @@ def obtener_ficha_paciente(paciente_nombre):
     except Exception as e:
         st.error(f"Error al cargar ficha del paciente: {e}")
         return {
-            "id": None,
             "nombre": paciente_nombre,
             "sexo": "-",
-            "talla_m": None,
             "cantidad_evaluaciones": 0,
             "ultima_fecha": "-",
             "ultima_clasificacion": "-",
@@ -551,22 +501,13 @@ st.title("Calculadora de Condición Física")
 with st.expander("➕ Nuevo paciente"):
     nuevo_nombre = st.text_input("Nombre del nuevo paciente", key="nuevo_nombre_alta")
     nuevo_sexo = st.selectbox("Sexo del nuevo paciente", ["hombre", "mujer"], key="nuevo_sexo_alta")
-    nueva_talla = st.number_input(
-        "Talla (m)",
-        min_value=0.50,
-        max_value=2.50,
-        value=1.70,
-        step=0.01,
-        format="%.2f",
-        key="nueva_talla_alta"
-    )
 
     if st.button("Guardar paciente", key="btn_guardar_paciente"):
         if not nuevo_nombre.strip():
             st.warning("Ingresá el nombre del paciente.")
         else:
             try:
-                guardar_paciente(nuevo_nombre, nuevo_sexo, nueva_talla)
+                guardar_paciente(nuevo_nombre, nuevo_sexo)
                 st.success("Paciente agregado correctamente.")
                 st.rerun()
             except Exception as e:
@@ -580,8 +521,6 @@ if not opciones_pacientes:
     st.stop()
 
 paciente_nombre = st.selectbox("Seleccionar paciente", opciones_pacientes, key="selector_paciente")
-paciente_actual = next((p for p in pacientes if p["nombre"] == paciente_nombre), None)
-paciente_id = paciente_actual["id"] if paciente_actual else None
 
 # =========================================================
 # FICHA
@@ -596,10 +535,6 @@ with st.container(border=True):
     with col1:
         st.write(f"**Nombre:** {ficha['nombre']}")
         st.write(f"**Sexo:** {str(ficha['sexo']).capitalize() if ficha['sexo'] != '-' else '-'}")
-        if ficha["talla_m"] is not None:
-            st.write(f"**Talla:** {float(ficha['talla_m']):.2f} m")
-        else:
-            st.write("**Talla:** -")
 
     with col2:
         st.write(f"**Evaluaciones:** {ficha['cantidad_evaluaciones']}")
@@ -608,94 +543,6 @@ with st.container(border=True):
     with col3:
         st.write(f"**Última clasificación:** {ficha['ultima_clasificacion']}")
         st.write(f"**Última prueba:** {ficha['ultima_prueba']}")
-
-st.markdown("### Peso e IMC")
-
-if ficha["talla_m"] is None or float(ficha["talla_m"]) <= 0:
-    st.warning("Este paciente no tiene una talla válida cargada en la tabla pacientes.")
-else:
-    col_p1, col_p2, col_p3 = st.columns(3)
-
-    with col_p1:
-        fecha_peso = st.date_input(
-            "Fecha de peso",
-            value=date.today(),
-            key=f"fecha_peso_{paciente_id}"
-        )
-
-    with col_p2:
-        peso_kg = st.number_input(
-            "Peso (kg)",
-            min_value=0.0,
-            max_value=300.0,
-            value=70.0,
-            step=0.1,
-            format="%.1f",
-            key=f"peso_kg_{paciente_id}"
-        )
-
-    with col_p3:
-        imc_calculado = round(float(peso_kg) / (float(ficha["talla_m"]) ** 2), 2)
-        st.metric("IMC calculado", f"{imc_calculado:.2f}")
-
-    if st.button("Guardar peso", key=f"btn_guardar_peso_{paciente_id}"):
-        try:
-            guardar_peso(
-                paciente_id=paciente_id,
-                fecha_medicion=fecha_peso,
-                peso_kg=peso_kg,
-                talla_m=ficha["talla_m"]
-            )
-            st.success("Peso guardado correctamente.")
-            st.rerun()
-        except Exception as e:
-            st.error(f"Error al guardar peso: {e}")
-
-    df_peso = obtener_historial_peso(paciente_id)
-
-    if not df_peso.empty:
-        df_peso["fecha"] = pd.to_datetime(df_peso["fecha"], errors="coerce")
-        df_peso = df_peso.dropna(subset=["fecha"]).sort_values("fecha", ascending=False)
-
-        ultimo_peso = df_peso.iloc[0]
-
-        c1, c2, c3 = st.columns(3)
-        c1.metric("Último peso", f"{float(ultimo_peso['peso_kg']):.1f} kg")
-        c2.metric("Último IMC", f"{float(ultimo_peso['imc']):.2f}")
-        c3.metric("Última fecha", ultimo_peso["fecha"].strftime("%d-%m-%Y"))
-
-        st.markdown("#### Historial de peso")
-        df_peso_mostrar = df_peso[["fecha", "peso_kg", "imc"]].copy()
-        df_peso_mostrar["fecha"] = df_peso_mostrar["fecha"].dt.strftime("%Y-%m-%d")
-
-        st.dataframe(
-            df_peso_mostrar,
-            use_container_width=True,
-            hide_index=True
-        )
-
-        df_peso_graf = df_peso.copy().sort_values("fecha", ascending=True)
-        df_peso_graf["fecha"] = pd.to_datetime(df_peso_graf["fecha"], errors="coerce").dt.date
-        df_peso_graf["peso_kg"] = pd.to_numeric(df_peso_graf["peso_kg"], errors="coerce")
-        df_peso_graf["imc"] = pd.to_numeric(df_peso_graf["imc"], errors="coerce")
-        df_peso_graf = df_peso_graf.dropna(subset=["fecha", "peso_kg", "imc"])
-
-        if not df_peso_graf.empty:
-            st.markdown("#### Evolución de peso")
-            graf_peso = alt.Chart(df_peso_graf).mark_line(point=True).encode(
-                x=alt.X("yearmonthdate(fecha):T", title="Fecha"),
-                y=alt.Y("peso_kg:Q", title="Peso (kg)")
-            ).properties(height=250)
-
-            st.altair_chart(graf_peso, use_container_width=True)
-
-            st.markdown("#### Evolución de IMC")
-            graf_imc = alt.Chart(df_peso_graf).mark_line(point=True).encode(
-                x=alt.X("yearmonthdate(fecha):T", title="Fecha"),
-                y=alt.Y("imc:Q", title="IMC")
-            ).properties(height=250)
-
-            st.altair_chart(graf_imc, use_container_width=True)
 
 st.divider()
 
