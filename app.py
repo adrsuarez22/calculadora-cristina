@@ -593,13 +593,37 @@ st.markdown("### Ficha del paciente")
 with st.container(border=True):
     col1, col2, col3 = st.columns([1.4, 1, 1])
 
+    with st.container(border=True):
+    col1, col2, col3 = st.columns([1.4, 1, 1])
+
     with col1:
         st.write(f"**Nombre:** {ficha['nombre']}")
         st.write(f"**Sexo:** {str(ficha['sexo']).capitalize() if ficha['sexo'] != '-' else '-'}")
-        if ficha["talla_m"] is not None:
-            st.write(f"**Talla:** {float(ficha['talla_m']):.2f} m")
+
+        talla_actual = ficha.get("talla_m")
+
+        if talla_actual:
+            st.write(f"**Talla:** {float(talla_actual):.2f} m")
         else:
             st.write("**Talla:** -")
+
+        editar_talla = st.number_input(
+            "Editar talla (m)",
+            min_value=1.20,
+            max_value=2.20,
+            value=float(talla_actual) if talla_actual else 1.70,
+            step=0.01,
+            format="%.2f",
+            key=f"editar_talla_{ficha['id']}"
+        )
+
+        if st.button("Guardar talla", key=f"btn_guardar_talla_{ficha['id']}"):
+            supabase.table("pacientes").update(
+                {"talla_m": float(editar_talla)}
+            ).eq("id", ficha["id"]).execute()
+
+            st.success("Talla guardada")
+            st.rerun()
 
     with col2:
         st.write(f"**Evaluaciones:** {ficha['cantidad_evaluaciones']}")
@@ -1010,3 +1034,4 @@ if paciente_nombre:
     else:
         st.markdown("### Historial del paciente")
         st.info("Todavía no hay evaluaciones guardadas para este paciente.")
+
