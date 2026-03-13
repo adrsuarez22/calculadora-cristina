@@ -200,7 +200,7 @@ def guardar_peso(paciente_id, fecha_medicion, peso_kg, talla_m):
         "imc": imc
     }
 
-   return supabase.table("seguimiento_peso").insert(payload).execute()
+    return supabase.table("seguimiento_peso").insert(payload).execute()
 
 def clasificar_imc(imc_calculado):
     if imc_calculado < 18.5:
@@ -1039,6 +1039,7 @@ if paciente_nombre:
     else:
         st.markdown("### Historial del paciente")
         st.info("Todavía no hay evaluaciones guardadas para este paciente.")
+
 
 
 
