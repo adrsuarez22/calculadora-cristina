@@ -264,7 +264,52 @@ def obtener_pacientes():
     except Exception as e:
         st.error(f"Error al leer pacientes: {e}")
         return []
+def guardar_inbody(
+    paciente_id,
+    fecha_estudio,
+    peso_kg,
+    imc,
+    grasa_corporal_pct,
+    masa_muscular_kg,
+    agua_corporal_pct,
+    grasa_visceral,
+    metabolismo_basal,
+    observaciones
+):
+    payload = {
+        "paciente_id": int(paciente_id),
+        "fecha": str(fecha_estudio),
+        "peso_kg": float(peso_kg) if peso_kg is not None else None,
+        "imc": float(imc) if imc is not None else None,
+        "grasa_corporal_pct": float(grasa_corporal_pct) if grasa_corporal_pct is not None else None,
+        "masa_muscular_kg": float(masa_muscular_kg) if masa_muscular_kg is not None else None,
+        "agua_corporal_pct": float(agua_corporal_pct) if agua_corporal_pct is not None else None,
+        "grasa_visceral": float(grasa_visceral) if grasa_visceral is not None else None,
+        "metabolismo_basal": float(metabolismo_basal) if metabolismo_basal is not None else None,
+        "observaciones": str(observaciones).strip() if observaciones else None
+    }
 
+    return supabase.table("inbody_registros").insert(payload).execute()
+
+
+def obtener_historial_inbody(paciente_id):
+    try:
+        respuesta = (
+            supabase.table("inbody_registros")
+            .select("*")
+            .eq("paciente_id", int(paciente_id))
+            .order("fecha", desc=True)
+            .execute()
+        )
+
+        if respuesta.data:
+            return pd.DataFrame(respuesta.data)
+
+        return pd.DataFrame()
+
+    except Exception as e:
+        st.error(f"Error al leer historial InBody: {e}")
+        return pd.DataFrame()
 
 def obtener_ficha_paciente(paciente_nombre):
     try:
@@ -1061,6 +1106,7 @@ if paciente_nombre:
     else:
         st.markdown("### Historial del paciente")
         st.info("Todavía no hay evaluaciones guardadas para este paciente.")
+
 
 
 
