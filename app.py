@@ -696,13 +696,13 @@ else:
         with c1:
             st.markdown(f"**Último peso:** {float(ultimo_peso['peso_kg']):.1f} kg")
 
-        With c2:
+        with c2:
             st.markdown(f"**Último IMC:** {float(ultimo_peso['imc']):.2f}")
 
         with c3:
-           st.markdown(f"**Última fecha:** {ultimo_peso['fecha'].strftime('%d-%m-%Y')}")
+            st.markdown(f"**Última fecha:** {ultimo_peso['fecha'].strftime('%d-%m-%Y')}")
 
-        st.markdown("#### Historial de peso")
+        st.markdown("### Historial de peso")
         df_peso_mostrar = df_peso[["fecha", "peso_kg", "imc"]].copy()
         df_peso_mostrar["fecha"] = df_peso_mostrar["fecha"].dt.strftime("%Y-%m-%d")
 
@@ -1048,6 +1048,7 @@ if paciente_nombre:
     else:
         st.markdown("### Historial del paciente")
         st.info("Todavía no hay evaluaciones guardadas para este paciente.")
+
 
 
 
