@@ -593,16 +593,13 @@ st.markdown("### Ficha del paciente")
 with st.container(border=True):
     col1, col2, col3 = st.columns([1.4, 1, 1])
 
-    with st.container(border=True):
-    col1, col2, col3 = st.columns([1.4, 1, 1])
-
     with col1:
         st.write(f"**Nombre:** {ficha['nombre']}")
         st.write(f"**Sexo:** {str(ficha['sexo']).capitalize() if ficha['sexo'] != '-' else '-'}")
 
         talla_actual = ficha.get("talla_m")
 
-        if talla_actual:
+        if talla_actual is not None:
             st.write(f"**Talla:** {float(talla_actual):.2f} m")
         else:
             st.write("**Talla:** -")
@@ -611,7 +608,7 @@ with st.container(border=True):
             "Editar talla (m)",
             min_value=1.20,
             max_value=2.20,
-            value=float(talla_actual) if talla_actual else 1.70,
+            value=float(talla_actual) if talla_actual is not None else 1.70,
             step=0.01,
             format="%.2f",
             key=f"editar_talla_{ficha['id']}"
@@ -632,7 +629,6 @@ with st.container(border=True):
     with col3:
         st.write(f"**Última clasificación:** {ficha['ultima_clasificacion']}")
         st.write(f"**Última prueba:** {ficha['ultima_prueba']}")
-
 st.markdown("### Peso e IMC")
 
 if ficha["talla_m"] is None or float(ficha["talla_m"]) <= 0:
@@ -1034,4 +1030,5 @@ if paciente_nombre:
     else:
         st.markdown("### Historial del paciente")
         st.info("Todavía no hay evaluaciones guardadas para este paciente.")
+
 
