@@ -3,3 +3,4 @@ pandas
 altair
 supabase
 reportlab
+openpyxl
