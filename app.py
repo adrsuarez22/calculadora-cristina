@@ -795,6 +795,46 @@ else:
         st.altair_chart(grafico_doble, use_container_width=True)
 
 st.divider()
+st.markdown("## Composición corporal (InBody)")
+
+col_i1, col_i2 = st.columns(2)
+
+with col_i1:
+    fecha_inbody = st.date_input("Fecha estudio", value=date.today(), key=f"inbody_fecha_{paciente_id}")
+    peso_inbody = st.number_input("Peso (kg)", min_value=0.0, max_value=300.0, step=0.1, key=f"inbody_peso_{paciente_id}")
+    imc_inbody = st.number_input("IMC", min_value=0.0, max_value=60.0, step=0.1, key=f"inbody_imc_{paciente_id}")
+    grasa_pct = st.number_input("% grasa corporal", min_value=0.0, max_value=80.0, step=0.1, key=f"inbody_grasa_{paciente_id}")
+
+with col_i2:
+    masa_muscular = st.number_input("Masa muscular (kg)", min_value=0.0, max_value=100.0, step=0.1, key=f"inbody_musculo_{paciente_id}")
+    agua_pct = st.number_input("% agua corporal", min_value=0.0, max_value=100.0, step=0.1, key=f"inbody_agua_{paciente_id}")
+    grasa_visceral = st.number_input("Grasa visceral", min_value=0.0, max_value=30.0, step=0.1, key=f"inbody_visceral_{paciente_id}")
+    metabolismo = st.number_input("Metabolismo basal", min_value=0.0, max_value=4000.0, step=10.0, key=f"inbody_metabolismo_{paciente_id}")
+
+observaciones_inbody = st.text_area("Observaciones", key=f"inbody_obs_{paciente_id}")
+
+if st.button("Guardar estudio InBody", key=f"guardar_inbody_{paciente_id}"):
+
+    try:
+
+        guardar_inbody(
+            paciente_id,
+            fecha_inbody,
+            peso_inbody,
+            imc_inbody,
+            grasa_pct,
+            masa_muscular,
+            agua_pct,
+            grasa_visceral,
+            metabolismo,
+            observaciones_inbody
+        )
+
+        st.success("Estudio InBody guardado correctamente")
+        st.rerun()
+
+    except Exception as e:
+        st.error(f"Error al guardar InBody: {e}")
 # =========================================================
 # FORMULARIO
 # =========================================================
@@ -1106,6 +1146,7 @@ if paciente_nombre:
     else:
         st.markdown("### Historial del paciente")
         st.info("Todavía no hay evaluaciones guardadas para este paciente.")
+
 
 
 
