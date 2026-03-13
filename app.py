@@ -683,57 +683,78 @@ else:
         except Exception as e:
             st.error(f"Error al guardar peso: {e}")
 
-    df_peso = obtener_historial_peso(paciente_id)
+   df_peso = obtener_historial_peso(paciente_id)
 
-    if not df_peso.empty:
-        df_peso["fecha"] = pd.to_datetime(df_peso["fecha"], errors="coerce")
-        df_peso = df_peso.dropna(subset=["fecha"]).sort_values("fecha", ascending=False)
+if not df_peso.empty:
+    df_peso["fecha"] = pd.to_datetime(df_peso["fecha"], errors="coerce")
+    df_peso["peso_kg"] = pd.to_numeric(df_peso["peso_kg"], errors="coerce")
+    df_peso["imc"] = pd.to_numeric(df_peso["imc"], errors="coerce")
+    df_peso = df_peso.dropna(subset=["fecha", "peso_kg", "imc"]).sort_values("fecha", ascending=False)
 
-        ultimo_peso = df_peso.iloc[0]
+    ultimo_peso = df_peso.iloc[0]
 
-        c1, c2, c3 = st.columns(3)
+    c1, c2, c3 = st.columns(3)
 
-        with c1:
-            st.markdown(f"**Último peso:** {float(ultimo_peso['peso_kg']):.1f} kg")
+    with c1:
+        st.markdown(f"**Último peso:** {float(ultimo_peso['peso_kg']):.1f} kg")
 
-        with c2:
-            st.markdown(f"**Último IMC:** {float(ultimo_peso['imc']):.2f}")
+    with c2:
+        st.markdown(f"**Último IMC:** {float(ultimo_peso['imc']):.2f}")
 
-        with c3:
-            st.markdown(f"**Última fecha:** {ultimo_peso['fecha'].strftime('%d-%m-%Y')}")
+    with c3:
+        st.markdown(f"**Última fecha:** {ultimo_peso['fecha'].strftime('%d-%m-%Y')}")
 
-        st.markdown("### Historial de peso")
-        df_peso_mostrar = df_peso[["fecha", "peso_kg", "imc"]].copy()
-        df_peso_mostrar["fecha"] = df_peso_mostrar["fecha"].dt.strftime("%Y-%m-%d")
+    if len(df_peso) > 1:
+        peso_actual = float(df_peso.iloc[0]["peso_kg"])
+        peso_anterior = float(df_peso.iloc[1]["peso_kg"])
+        diferencia_peso = round(peso_actual - peso_anterior, 1)
 
-        st.dataframe(
-            df_peso_mostrar,
-            use_container_width=True,
-            hide_index=True
-        )
+        if diferencia_peso > 0:
+            tendencia_texto = f"↑ {diferencia_peso:.1f} kg"
+        elif diferencia_peso < 0:
+            tendencia_texto = f"↓ {abs(diferencia_peso):.1f} kg"
+        else:
+            tendencia_texto = "Sin cambios"
 
-        df_peso_graf = df_peso.copy().sort_values("fecha", ascending=True)
-        df_peso_graf["fecha"] = pd.to_datetime(df_peso_graf["fecha"], errors="coerce").dt.date
-        df_peso_graf["peso_kg"] = pd.to_numeric(df_peso_graf["peso_kg"], errors="coerce")
-        df_peso_graf["imc"] = pd.to_numeric(df_peso_graf["imc"], errors="coerce")
-        df_peso_graf = df_peso_graf.dropna(subset=["fecha", "peso_kg", "imc"])
+        st.markdown(f"**Tendencia desde la medición anterior:** {tendencia_texto}")
 
-        if not df_peso_graf.empty:
-            st.markdown("#### Evolución de peso")
-            graf_peso = alt.Chart(df_peso_graf).mark_line(point=True).encode(
-                x=alt.X("yearmonthdate(fecha):T", title="Fecha"),
-                y=alt.Y("peso_kg:Q", title="Peso (kg)")
-            ).properties(height=250)
+    st.markdown("### Historial de peso")
+    df_peso_mostrar = df_peso[["fecha", "peso_kg", "imc"]].copy()
+    df_peso_mostrar["fecha"] = df_peso_mostrar["fecha"].dt.strftime("%Y-%m-%d")
 
-            st.altair_chart(graf_peso, use_container_width=True)
+    st.dataframe(
+        df_peso_mostrar,
+        use_container_width=True,
+        hide_index=True
+    )
 
-            st.markdown("#### Evolución de IMC")
-            graf_imc = alt.Chart(df_peso_graf).mark_line(point=True).encode(
-                x=alt.X("yearmonthdate(fecha):T", title="Fecha"),
-                y=alt.Y("imc:Q", title="IMC")
-            ).properties(height=250)
+    df_peso_graf = df_peso.copy().sort_values("fecha", ascending=True)
+    df_peso_graf["fecha"] = pd.to_datetime(df_peso_graf["fecha"], errors="coerce")
 
-            st.altair_chart(graf_imc, use_container_width=True)
+    st.markdown("### Evolución de peso e IMC")
+
+    grafico_doble = alt.Chart(df_peso_graf).transform_fold(
+        ["peso_kg", "imc"],
+        as_=["variable", "valor"]
+    ).mark_line(point=True).encode(
+        x=alt.X("yearmonthdate(fecha):T", title="Fecha"),
+        y=alt.Y("valor:Q", title="Valor"),
+        color=alt.Color(
+            "variable:N",
+            title="Serie",
+            scale=alt.Scale(
+                domain=["peso_kg", "imc"],
+                range=["#1f77b4", "#ff7f0e"]
+            )
+        ),
+        tooltip=[
+            alt.Tooltip("yearmonthdate(fecha):T", title="Fecha"),
+            alt.Tooltip("variable:N", title="Serie"),
+            alt.Tooltip("valor:Q", title="Valor", format=".2f")
+        ]
+    ).properties(height=320)
+
+    st.altair_chart(grafico_doble, use_container_width=True)
 
 st.divider()
 
@@ -1048,6 +1069,7 @@ if paciente_nombre:
     else:
         st.markdown("### Historial del paciente")
         st.info("Todavía no hay evaluaciones guardadas para este paciente.")
+
 
 
 
