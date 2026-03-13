@@ -667,11 +667,8 @@ else:
         imc_calculado = round(float(peso_kg) / (float(ficha["talla_m"]) ** 2), 2)
         clasificacion_imc, color_imc = clasificar_imc(imc_calculado)
 
-        st.metric(
-        "IMC calculado",
-        f"{imc_calculado:.2f}",
-        f"{color_imc} {clasificacion_imc}"
-      )
+        st.markdown(f"**IMC:** {imc_calculado:.2f}")
+        st.markdown(f"{color_imc} {clasificacion_imc}")
 
     if st.button("Guardar peso", key=f"btn_guardar_peso_{paciente_id}"):
         try:
@@ -1045,6 +1042,7 @@ if paciente_nombre:
     else:
         st.markdown("### Historial del paciente")
         st.info("Todavía no hay evaluaciones guardadas para este paciente.")
+
 
 
 
