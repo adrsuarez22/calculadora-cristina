@@ -1266,7 +1266,6 @@ def generar_excel_paciente(ficha, df_peso, df_inbody, df_eval, df_medicacion):
         
 with pd.ExcelWriter(output, engine="openpyxl") as writer:
 
-    # Hoja actual
     df_export = preparar_df_exportacion(df_estadistico)
 
     df_export.to_excel(
@@ -1274,10 +1273,6 @@ with pd.ExcelWriter(output, engine="openpyxl") as writer:
         sheet_name="Datos_Estadisticos",
         index=False
     )
-
-    # ==========================
-    # DATASET CLINICO (formato largo)
-    # ==========================
 
     dataset_clinico = df_export.melt(
         id_vars=["Paciente", "Sexo", "Edad", "Fecha"],
