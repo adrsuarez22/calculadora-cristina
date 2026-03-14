@@ -1265,17 +1265,33 @@ def generar_excel_paciente(ficha, df_peso, df_inbody, df_eval, df_medicacion):
         ])
 
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
-        preparar_df_exportacion(df_estadistico).to_excel(
-            writer,
-            sheet_name="Datos_Estadisticos",
-            index=False
-        )
 
-        workbook = writer.book
-        _formatear_hoja_excel(workbook["Datos_Estadisticos"])
+    # hoja actual
+    preparar_df_exportacion(df_estadistico).to_excel(
+        writer,
+        sheet_name="Datos_Estadisticos",
+        index=False
+    )
 
-    output.seek(0)
-    return output
+    # ==================================
+    # NUEVA HOJA PARA ANALISIS CLINICO
+    # ==================================
+
+    dataset_clinico = preparar_df_exportacion(df_estadistico).copy()
+
+    dataset_clinico = dataset_clinico.melt(
+        id_vars=["Paciente", "Sexo", "Edad", "Fecha"],
+        var_name="Variable",
+        value_name="Valor"
+    )
+
+    dataset_clinico = dataset_clinico.dropna(subset=["Valor"])
+
+    dataset_clinico.to_excel(
+        writer,
+        sheet_name="Dataset_Clinico",
+        index=False
+    )
 
 # =========================================================
 # EXPORTACIÓN PDF
