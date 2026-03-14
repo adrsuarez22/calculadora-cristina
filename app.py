@@ -1066,10 +1066,11 @@ def generar_excel_paciente(ficha, df_peso, df_inbody, df_eval, df_medicacion):
     df_medicacion_export = agregar_identificacion_paciente(df_medicacion, ficha, "Medicacion")
 
     df_analisis = generar_df_analisis_cientifico(
-        ficha=ficha,
-        df_peso=df_peso,
-        df_inbody=df_inbody,
-        df_eval=df_eval
+    ficha=ficha,
+    df_peso=df_peso,
+    df_inbody=df_inbody,
+    df_eval=df_eval,
+    df_medicacion=df_medicacion
     )
 
     if not df_analisis.empty:
@@ -1183,6 +1184,15 @@ def generar_pdf_paciente(ficha, df_peso, df_inbody, df_eval, df_medicacion):
     df_eval_pdf = _df_para_pdf(df_eval)
     df_medicacion_pdf = _df_para_pdf(df_medicacion)
 
+    df_analisis_pdf = generar_df_analisis_cientifico(
+        ficha=ficha,
+        df_peso=df_peso,
+        df_inbody=df_inbody,
+        df_eval=df_eval,
+        df_medicacion=df_medicacion
+    )
+    df_analisis_pdf = _df_para_pdf(df_analisis_pdf)
+
     if not df_inbody_pdf.empty:
         df_inbody_pdf = enriquecer_historial_corporal(
             df_inbody_pdf,
@@ -1260,11 +1270,20 @@ def generar_pdf_paciente(ficha, df_peso, df_inbody, df_eval, df_medicacion):
         anchos_cm=[2.2, 3.3, 1.6, 1.5, 2.3, 2.1, 1.8, 3.2],
         styles=styles
     ))
+    story.append(Spacer(1, 0.35 * cm))
+
+    story.append(Paragraph("Análisis integrado", styles["SubTitulo"]))
+    story.append(_tabla_pdf_desde_df(
+        df_analisis_pdf,
+        columnas=["Fecha", "TipoRegistro", "Prueba", "Percentil", "DiagnosticoCorporal", "Droga_Vigente", "Dosis_Vigente"],
+        titulos=["Fecha", "Tipo", "Prueba", "Percentil", "Diagnóstico", "Droga", "Dosis"],
+        anchos_cm=[2.0, 2.7, 3.3, 1.5, 3.4, 2.6, 2.2],
+        styles=styles
+    ))
 
     doc.build(story)
     buffer.seek(0)
     return buffer
-
 
 # =========================================================
 # UTILIDADES CLÍNICAS - FUNCIONALES
