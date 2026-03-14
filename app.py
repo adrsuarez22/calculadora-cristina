@@ -1946,6 +1946,7 @@ with m2:
             st.info("Sin historial de medicación.")
 
 st.divider()
+filtro_historial_global = "Todas"
 
 # =========================================================
 # HISTORIALES
@@ -2003,13 +2004,14 @@ with h2:
     df_historial = obtener_historial_paciente(paciente_nombre)
 
     if not df_historial.empty:
-        prueba_filtro = st.selectbox(
-            "Filtrar historial por prueba",
-            options=["Todas", "Caminata 6 minutos", "Prensión manual", "Levantarse de la silla"],
-            index=0,
-            key="filtro_historial_prueba"
-        )
+        filtro_historial_global = st.selectbox(
+    "Filtrar historial por prueba",
+    options=["Todas", "Caminata 6 minutos", "Prensión manual", "Levantarse de la silla"],
+    index=0,
+    key="filtro_historial_prueba"
+)
 
+prueba_filtro = filtro_historial_global
         if prueba_filtro == "Todas":
             df_historial_filtrado = df_historial.copy()
         else:
@@ -2123,11 +2125,22 @@ with g2:
             df_graf_base["prueba"] = df_graf_base["prueba"].astype(str).str.strip()
             df_graf_base = df_graf_base.dropna(subset=["fecha", "percentil", "prueba"])
 
-            prueba_grafico = st.selectbox(
-                "Prueba para gráfico",
-                options=["Caminata 6 minutos", "Prensión manual", "Levantarse de la silla"],
-                key="selector_grafico_prueba"
-            )
+            opciones_prueba = ["Caminata 6 minutos", "Prensión manual", "Levantarse de la silla"]
+
+            if filtro_historial_global != "Todas":
+                prueba_grafico = filtro_historial_global
+                st.text_input(
+                    "Prueba para gráfico",
+                    value=prueba_grafico,
+                    disabled=True,
+                    key="prueba_grafico_bloqueada"
+                )
+            else:
+                prueba_grafico = st.selectbox(
+                    "Prueba para gráfico",
+                    options=opciones_prueba,
+                    key="selector_grafico_prueba"
+                )
 
             df_prueba = df_graf_base[df_graf_base["prueba"] == prueba_grafico].copy()
 
