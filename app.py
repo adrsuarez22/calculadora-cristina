@@ -1263,52 +1263,19 @@ def generar_excel_paciente(ficha, df_peso, df_inbody, df_eval, df_medicacion):
             "Via",
             "Estado"
         ])
-        
-with pd.ExcelWriter(output, engine="openpyxl") as writer:
 
-    df_export = preparar_df_exportacion(df_estadistico)
+    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        preparar_df_exportacion(df_estadistico).to_excel(
+            writer,
+            sheet_name="Datos_Estadisticos",
+            index=False
+        )
 
-    df_export.to_excel(
-        writer,
-        sheet_name="Datos_Estadisticos",
-        index=False
-    )
+        workbook = writer.book
+        _formatear_hoja_excel(workbook["Datos_Estadisticos"])
 
-    dataset_clinico = df_export.melt(
-        id_vars=["Paciente", "Sexo", "Edad", "Fecha"],
-        var_name="Variable",
-        value_name="Valor"
-    )
-
-    dataset_clinico = dataset_clinico.dropna(subset=["Valor"])
-
-    dataset_clinico.to_excel(
-        writer,
-        sheet_name="Dataset_Clinico",
-        index=False
-    )
-
-    workbook = writer.book
-    _formatear_hoja_excel(workbook["Datos_Estadisticos"])
-    _formatear_hoja_excel(workbook["Dataset_Clinico"])
-
-output.seek(0)
-return output
-
-    dataset_clinico = dataset_clinico.dropna(subset=["Valor"])
-
-    dataset_clinico.to_excel(
-        writer,
-        sheet_name="Dataset_Clinico",
-        index=False
-    )
-
-    workbook = writer.book
-    _formatear_hoja_excel(workbook["Datos_Estadisticos"])
-    _formatear_hoja_excel(workbook["Dataset_Clinico"])
-
-output.seek(0)
-return output
+    output.seek(0)
+    return output
 
 # =========================================================
 # EXPORTACIÓN PDF
