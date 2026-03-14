@@ -373,7 +373,7 @@ def obtener_pacientes():
     try:
         respuesta = (
             supabase.table("pacientes")
-            .select("id,nombre,sexo,talla_m")
+            .select("id,nombre,sexo,fecha_nacimiento,talla_m")
             .order("nombre")
             .execute()
         )
@@ -1153,23 +1153,116 @@ def generar_tabla_estadistica(ficha, df_peso, df_inbody, df_eval, df_medicacion)
         inplace=True
     )
 
+    # Identificación del paciente
     df_final.insert(0, "PacienteID_Ficha", ficha.get("id"))
     df_final.insert(0, "Paciente", ficha.get("nombre"))
     df_final.insert(2, "Sexo", ficha.get("sexo"))
     df_final.insert(3, "FechaNacimiento", ficha.get("fecha_nacimiento"))
+
+    # Edad al momento de cada medición
+    df_final["Fecha"] = pd.to_datetime(df_final["Fecha"], errors="coerce")
+    df_final["FechaNacimiento"] = pd.to_datetime(df_final["FechaNacimiento"], errors="coerce")
+    df_final["Edad"] = ((df_final["Fecha"] - df_final["FechaNacimiento"]).dt.days / 365.25).round(1)
+
+    # Orden final de columnas
+    columnas_orden = [
+        "Paciente",
+        "PacienteID_Ficha",
+        "Sexo",
+        "FechaNacimiento",
+        "Edad",
+        "Fecha",
+        "Peso_kg",
+        "IMC",
+        "Grasa_pct",
+        "Musculo_kg",
+        "Agua_pct",
+        "Grasa_Visceral",
+        "Prension_kg",
+        "Prension_percentil",
+        "SitToStand_rep",
+        "SitToStand_percentil",
+        "Caminata6m_m",
+        "Caminata6m_percentil",
+        "Droga",
+        "Dosis",
+        "Unidad",
+        "Frecuencia",
+        "Via",
+        "Estado"
+    ]
+
+    columnas_presentes = [c for c in columnas_orden if c in df_final.columns]
+    df_final = df_final[columnas_presentes]
+
     return df_final
 
 
 def generar_excel_paciente(ficha, df_peso, df_inbody, df_eval, df_medicacion):
     output = BytesIO()
 
-    df_estadistico = generar_tabla_estadistica(
-        ficha=ficha,
-        df_peso=df_peso,
-        df_inbody=df_inbody,
-        df_eval=df_eval,
-        df_medicacion=df_medicacion
-    )
+    pacientes = obtener_pacientes()
+    tablas = []
+
+    for p in pacientes:
+        ficha_local = {
+            "id": p.get("id"),
+            "nombre": p.get("nombre"),
+            "sexo": p.get("sexo"),
+            "fecha_nacimiento": p.get("fecha_nacimiento"),
+            "talla_m": p.get("talla_m")
+        }
+
+        paciente_id = p.get("id")
+        paciente_nombre = p.get("nombre")
+
+        df_peso_p = obtener_historial_peso(paciente_id)
+        df_inbody_p = obtener_historial_inbody(paciente_id)
+        df_eval_p = obtener_historial_paciente(paciente_nombre)
+        df_medicacion_p = obtener_historial_medicacion(paciente_id)
+
+        tabla_p = generar_tabla_estadistica(
+            ficha=ficha_local,
+            df_peso=df_peso_p,
+            df_inbody=df_inbody_p,
+            df_eval=df_eval_p,
+            df_medicacion=df_medicacion_p
+        )
+
+        if tabla_p is not None and not tabla_p.empty:
+            tablas.append(tabla_p)
+
+    if tablas:
+        df_estadistico = pd.concat(tablas, ignore_index=True)
+        df_estadistico["Fecha"] = pd.to_datetime(df_estadistico["Fecha"], errors="coerce")
+        df_estadistico = df_estadistico.sort_values(["Paciente", "Fecha"]).reset_index(drop=True)
+    else:
+        df_estadistico = pd.DataFrame(columns=[
+            "Paciente",
+            "PacienteID_Ficha",
+            "Sexo",
+            "FechaNacimiento",
+            "Edad",
+            "Fecha",
+            "Peso_kg",
+            "IMC",
+            "Grasa_pct",
+            "Musculo_kg",
+            "Agua_pct",
+            "Grasa_Visceral",
+            "Prension_kg",
+            "Prension_percentil",
+            "SitToStand_rep",
+            "SitToStand_percentil",
+            "Caminata6m_m",
+            "Caminata6m_percentil",
+            "Droga",
+            "Dosis",
+            "Unidad",
+            "Frecuencia",
+            "Via",
+            "Estado"
+        ])
 
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
         preparar_df_exportacion(df_estadistico).to_excel(
@@ -1183,7 +1276,6 @@ def generar_excel_paciente(ficha, df_peso, df_inbody, df_eval, df_medicacion):
 
     output.seek(0)
     return output
-
 
 # =========================================================
 # EXPORTACIÓN PDF
