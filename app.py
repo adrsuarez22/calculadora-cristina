@@ -1038,6 +1038,105 @@ def _formatear_hoja_excel(ws):
         for cell in row:
             cell.alignment = Alignment(vertical="top", wrap_text=True)
 
+def generar_tabla_estadistica(df_peso, df_inbody, df_eval, df_medicacion):
+    from functools import reduce
+
+    if df_peso is not None and not df_peso.empty:
+        peso = df_peso.copy()
+        peso["fecha"] = pd.to_datetime(peso["fecha"], errors="coerce")
+        peso = peso[["fecha", "peso_kg", "imc"]]
+    else:
+        peso = pd.DataFrame(columns=["fecha", "peso_kg", "imc"])
+
+    if df_inbody is not None and not df_inbody.empty:
+        inbody = df_inbody.copy()
+        inbody["fecha"] = pd.to_datetime(inbody["fecha"], errors="coerce")
+        inbody = inbody[
+            [
+                "fecha",
+                "grasa_corporal_pct",
+                "masa_muscular_kg",
+                "agua_corporal_pct",
+                "grasa_visceral"
+            ]
+        ]
+    else:
+        inbody = pd.DataFrame(columns=[
+            "fecha",
+            "grasa_corporal_pct",
+            "masa_muscular_kg",
+            "agua_corporal_pct",
+            "grasa_visceral"
+        ])
+
+    if df_eval is not None and not df_eval.empty:
+        evals = df_eval.copy()
+        evals["fecha"] = pd.to_datetime(evals["fecha"], errors="coerce")
+
+        prension = evals[evals["prueba"] == "Prensión manual"][["fecha", "valor_medido", "percentil"]].copy()
+        prension.columns = ["fecha", "Prension_kg", "Prension_percentil"]
+
+        silla = evals[evals["prueba"] == "Levantarse de la silla"][["fecha", "valor_medido", "percentil"]].copy()
+        silla.columns = ["fecha", "SitToStand_rep", "SitToStand_percentil"]
+
+        caminata = evals[evals["prueba"] == "Caminata 6 minutos"][["fecha", "valor_medido", "percentil"]].copy()
+        caminata.columns = ["fecha", "Caminata6m_m", "Caminata6m_percentil"]
+    else:
+        prension = pd.DataFrame(columns=["fecha", "Prension_kg", "Prension_percentil"])
+        silla = pd.DataFrame(columns=["fecha", "SitToStand_rep", "SitToStand_percentil"])
+        caminata = pd.DataFrame(columns=["fecha", "Caminata6m_m", "Caminata6m_percentil"])
+
+    if df_medicacion is not None and not df_medicacion.empty:
+        med = df_medicacion.copy()
+        med["fecha_cambio"] = pd.to_datetime(med["fecha_cambio"], errors="coerce")
+        med = med[
+            [
+                "fecha_cambio",
+                "droga",
+                "dosis",
+                "unidad",
+                "frecuencia",
+                "via_administracion",
+                "estado"
+            ]
+        ].copy()
+        med.columns = [
+            "fecha",
+            "Droga",
+            "Dosis",
+            "Unidad",
+            "Frecuencia",
+            "Via",
+            "Estado"
+        ]
+    else:
+        med = pd.DataFrame(columns=["fecha", "Droga", "Dosis", "Unidad", "Frecuencia", "Via", "Estado"])
+
+    dfs = [peso, inbody, prension, silla, caminata, med]
+    dfs_validos = [df for df in dfs if df is not None]
+
+    if not dfs_validos:
+        return pd.DataFrame()
+
+    df_final = reduce(lambda left, right: pd.merge(left, right, on="fecha", how="outer"), dfs_validos)
+
+    df_final = df_final.sort_values("fecha").reset_index(drop=True)
+
+    df_final.rename(
+        columns={
+            "fecha": "Fecha",
+            "peso_kg": "Peso_kg",
+            "imc": "IMC",
+            "grasa_corporal_pct": "Grasa_pct",
+            "masa_muscular_kg": "Musculo_kg",
+            "agua_corporal_pct": "Agua_pct",
+            "grasa_visceral": "Grasa_Visceral"
+        },
+        inplace=True
+    )
+
+    return df_final
+
 
 def generar_excel_paciente(ficha, df_peso, df_inbody, df_eval, df_medicacion):
     output = BytesIO()
@@ -1072,6 +1171,13 @@ def generar_excel_paciente(ficha, df_peso, df_inbody, df_eval, df_medicacion):
     df_medicacion=df_medicacion
     )
 
+    df_estadistico = generar_tabla_estadistica(
+    df_peso=df_peso,
+    df_inbody=df_inbody,
+    df_eval=df_eval,
+    df_medicacion=df_medicacion
+    )  
+    
     if not df_analisis.empty:
         df_analisis = df_analisis.rename(columns={"PacienteID": "PacienteID_Ficha"})
 
@@ -1082,7 +1188,8 @@ def generar_excel_paciente(ficha, df_peso, df_inbody, df_eval, df_medicacion):
         preparar_df_exportacion(df_eval_export).to_excel(writer, sheet_name="03_Evaluaciones", index=False)
         preparar_df_exportacion(df_analisis).to_excel(writer, sheet_name="04_Analisis", index=False)
         preparar_df_exportacion(df_medicacion_export).to_excel(writer, sheet_name="05_Medicacion", index=False)
-
+        preparar_df_exportacion(df_estadistico).to_excel(writer, sheet_name="06_Datos_Estadisticos", index=False)
+        
         workbook = writer.book
         for nombre_hoja in workbook.sheetnames:
             _formatear_hoja_excel(workbook[nombre_hoja])
