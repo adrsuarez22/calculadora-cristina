@@ -1507,7 +1507,7 @@ if not opciones_pacientes:
 # =========================================================
 # ENCABEZADO
 # =========================================================
-top1, top2, top3 = st.columns([2, 1, 1])
+top1, top2, top3, top4 = st.columns([2, 1, 1, 1])
 
 with top1:
     paciente_nombre = st.selectbox(
@@ -1518,6 +1518,24 @@ with top1:
 
 paciente_actual = next((p for p in pacientes if p["nombre"] == paciente_nombre), None)
 paciente_id = paciente_actual["id"] if paciente_actual else None
+
+with top4:
+    st.markdown("###")
+    confirmar_eliminar = st.checkbox(
+        "Confirmar borrado",
+        key=f"confirmar_borrado_{paciente_id}"
+    )
+
+    if st.button("Eliminar paciente", key=f"btn_eliminar_paciente_{paciente_id}"):
+        if not confirmar_eliminar:
+            st.warning("Marcá la confirmación antes de eliminar.")
+        else:
+            try:
+                eliminar_paciente(paciente_id)
+                st.success("Paciente eliminado correctamente.")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Error al eliminar paciente: {e}")
 
 # =========================================================
 # FICHA + DATAFRAMES BASE
