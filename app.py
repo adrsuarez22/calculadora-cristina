@@ -200,7 +200,7 @@ def guardar_evaluacion(paciente_nombre, sexo, edad, prueba, valor_medido, percen
     return supabase.table("evaluaciones").insert(payload).execute()
 
 
-guardar_paciente(nuevo_nombre, nuevo_sexo, nueva_fecha_nacimiento, nueva_talla)
+def guardar_paciente(nombre, sexo, fecha_nacimiento, talla_m):
     nombre_limpio = str(nombre).strip()
     sexo_limpio = str(sexo).strip().lower()
 
