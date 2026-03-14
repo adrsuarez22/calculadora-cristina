@@ -2071,31 +2071,40 @@ with g1:
             df_peso["imc"] = pd.to_numeric(df_peso["imc"], errors="coerce")
             df_peso = df_peso.dropna(subset=["fecha", "peso_kg", "imc"]).sort_values("fecha", ascending=True)
 
-            grafico_doble = (
-                alt.Chart(df_peso)
-                .transform_fold(
-                    ["peso_kg", "imc"],
-                    as_=["variable", "valor"]
-                )
-                .mark_line(point=True)
-                .encode(
-                    x=alt.X("yearmonthdate(fecha):T", title="Fecha"),
-                    y=alt.Y(
-                        "valor:Q",
-                        title="Valor",
-                        scale=alt.Scale(domainMin=0)
-                    ),
-                    color=alt.Color("variable:N", title="Serie"),
-                    tooltip=[
-                        alt.Tooltip("yearmonthdate(fecha):T", title="Fecha"),
-                        alt.Tooltip("variable:N", title="Serie"),
-                        alt.Tooltip("valor:Q", title="Valor", format=".2f")
-                    ]
-                )
-                .properties(height=320)
-            )
+            if not df_peso.empty:
+                valor_max = max(df_peso["peso_kg"].max(), df_peso["imc"].max())
+                valor_max = max(10, round(valor_max * 1.10, 1))
 
-            st.altair_chart(grafico_doble, use_container_width=True)
+                df_peso_long = df_peso.melt(
+                    id_vars=["fecha"],
+                    value_vars=["peso_kg", "imc"],
+                    var_name="variable",
+                    value_name="valor"
+                )
+
+                grafico_doble = (
+                    alt.Chart(df_peso_long)
+                    .mark_line(point=True)
+                    .encode(
+                        x=alt.X("fecha:T", title="Fecha"),
+                        y=alt.Y(
+                            "valor:Q",
+                            title="Valor",
+                            scale=alt.Scale(domain=[0, valor_max], nice=False, zero=True)
+                        ),
+                        color=alt.Color("variable:N", title="Serie"),
+                        tooltip=[
+                            alt.Tooltip("fecha:T", title="Fecha"),
+                            alt.Tooltip("variable:N", title="Serie"),
+                            alt.Tooltip("valor:Q", title="Valor", format=".2f")
+                        ]
+                    )
+                    .properties(height=320)
+                )
+
+                st.altair_chart(grafico_doble, use_container_width=True)
+            else:
+                st.info("Sin datos válidos de peso / IMC.")
         else:
             st.info("Sin datos de peso / IMC.")
 
@@ -2107,7 +2116,7 @@ with g2:
 
         if not df_historial.empty and {"fecha", "percentil", "prueba"}.issubset(df_historial.columns):
             df_graf_base = df_historial.copy()
-            df_graf_base["fecha"] = pd.to_datetime(df_graf_base["fecha"], errors="coerce").dt.date
+            df_graf_base["fecha"] = pd.to_datetime(df_graf_base["fecha"], errors="coerce")
             df_graf_base["percentil"] = pd.to_numeric(df_graf_base["percentil"], errors="coerce")
             df_graf_base["prueba"] = df_graf_base["prueba"].astype(str).str.strip()
             df_graf_base = df_graf_base.dropna(subset=["fecha", "percentil", "prueba"])
@@ -2131,22 +2140,22 @@ with g2:
 
                 linea = alt.Chart(df_prueba).mark_line(point=False).encode(
                     x=alt.X(
-                        "yearmonthdate(fecha):T",
+                        "fecha:T",
                         title="Fecha",
                         axis=alt.Axis(format="%d-%m-%Y")
                     ),
                     y=alt.Y(
                         "percentil:Q",
                         title="Percentil",
-                        scale=alt.Scale(domain=[0, 100])
+                        scale=alt.Scale(domain=[0, 100], nice=False, zero=True)
                     )
                 )
 
                 puntos = alt.Chart(df_prueba).mark_circle(size=90).encode(
-                    x=alt.X("yearmonthdate(fecha):T"),
+                    x=alt.X("fecha:T"),
                     y=alt.Y(
                         "percentil:Q",
-                        scale=alt.Scale(domain=[0, 100])
+                        scale=alt.Scale(domain=[0, 100], nice=False, zero=True)
                     )
                 )
 
@@ -2154,10 +2163,10 @@ with g2:
                     dy=-12,
                     fontSize=12
                 ).encode(
-                    x=alt.X("yearmonthdate(fecha):T"),
+                    x=alt.X("fecha:T"),
                     y=alt.Y(
                         "percentil:Q",
-                        scale=alt.Scale(domain=[0, 100])
+                        scale=alt.Scale(domain=[0, 100], nice=False, zero=True)
                     ),
                     text="Etiqueta:N"
                 )
