@@ -1039,56 +1039,99 @@ def _formatear_hoja_excel(ws):
             cell.alignment = Alignment(vertical="top", wrap_text=True)
 
 
-def generar_excel_paciente(ficha, df_peso, df_inbody, df_eval, df_medicacion):
-    output = BytesIO()
+def generar_tabla_estadistica(df_peso, df_inbody, df_eval, df_medicacion):
 
-    ficha_df = pd.DataFrame([{
-        "Paciente": ficha["nombre"],
-        "PacienteID_Ficha": ficha["id"],
-        "Sexo": ficha["sexo"],
-        "Talla_m": ficha["talla_m"],
-        "CantidadEvaluaciones": ficha["cantidad_evaluaciones"],
-        "UltimaFechaEvaluacion": ficha["ultima_fecha"],
-        "UltimaClasificacion": ficha["ultima_clasificacion"],
-        "UltimaPrueba": ficha["ultima_prueba"],
-        "FechaExportacion": datetime.now().strftime("%Y-%m-%d %H:%M")
-    }])
+    # -----------------------------
+    # PESO
+    # -----------------------------
+    peso = df_peso.copy()
+    if not peso.empty:
+        peso = peso[["fecha", "peso_kg", "imc"]]
 
-    df_peso_export = agregar_identificacion_paciente(df_peso, ficha, "Peso_IMC")
-    df_inbody_enriquecido = enriquecer_historial_corporal(
-        df_inbody,
-        str(ficha["sexo"]).strip().lower(),
-        ficha["talla_m"]
+    # -----------------------------
+    # INBODY
+    # -----------------------------
+    inbody = df_inbody.copy()
+    if not inbody.empty:
+        inbody = inbody[
+            [
+                "fecha",
+                "grasa_corporal_pct",
+                "masa_muscular_kg",
+                "agua_corporal_pct",
+                "grasa_visceral"
+            ]
+        ]
+
+    # -----------------------------
+    # EVALUACIONES
+    # -----------------------------
+    evals = df_eval.copy()
+
+    prension = evals[evals["prueba"] == "Prensión manual"][["fecha", "valor_medido", "percentil"]]
+    prension.columns = ["fecha", "Prension_kg", "Prension_percentil"]
+
+    silla = evals[evals["prueba"] == "Levantarse de la silla"][["fecha", "valor_medido", "percentil"]]
+    silla.columns = ["fecha", "SitToStand_rep", "SitToStand_percentil"]
+
+    caminata = evals[evals["prueba"] == "Caminata 6 minutos"][["fecha", "valor_medido", "percentil"]]
+    caminata.columns = ["fecha", "Caminata6m_m", "Caminata6m_percentil"]
+
+    # -----------------------------
+    # MEDICACION
+    # -----------------------------
+    med = df_medicacion.copy()
+
+    if not med.empty:
+        med = med[
+            [
+                "fecha_cambio",
+                "droga",
+                "dosis",
+                "unidad",
+                "frecuencia",
+                "via_administracion",
+                "estado"
+            ]
+        ]
+        med.columns = [
+            "fecha",
+            "Droga",
+            "Dosis",
+            "Unidad",
+            "Frecuencia",
+            "Via",
+            "Estado"
+        ]
+
+    # -----------------------------
+    # MERGE GLOBAL
+    # -----------------------------
+    dfs = [peso, inbody, prension, silla, caminata, med]
+
+    from functools import reduce
+
+    df_final = reduce(
+        lambda left, right: pd.merge(left, right, on="fecha", how="outer"),
+        dfs
     )
-    df_inbody_export = agregar_identificacion_paciente(df_inbody_enriquecido, ficha, "Composicion_Corporal")
-    df_eval_export = agregar_identificacion_paciente(df_eval, ficha, "Evaluaciones")
-    df_medicacion_export = agregar_identificacion_paciente(df_medicacion, ficha, "Medicacion")
 
-    df_analisis = generar_df_analisis_cientifico(
-    ficha=ficha,
-    df_peso=df_peso,
-    df_inbody=df_inbody,
-    df_eval=df_eval,
-    df_medicacion=df_medicacion
+    df_final = df_final.sort_values("fecha").reset_index(drop=True)
+
+    df_final.rename(
+        columns={
+            "fecha": "Fecha",
+            "peso_kg": "Peso_kg",
+            "imc": "IMC",
+            "grasa_corporal_pct": "Grasa_pct",
+            "masa_muscular_kg": "Musculo_kg",
+            "agua_corporal_pct": "Agua_pct",
+            "grasa_visceral": "Grasa_Visceral"
+        },
+        inplace=True
     )
 
-    if not df_analisis.empty:
-        df_analisis = df_analisis.rename(columns={"PacienteID": "PacienteID_Ficha"})
-
-    with pd.ExcelWriter(output, engine="openpyxl") as writer:
-        preparar_df_exportacion(ficha_df).to_excel(writer, sheet_name="00_Ficha", index=False)
-        preparar_df_exportacion(df_peso_export).to_excel(writer, sheet_name="01_Peso_IMC", index=False)
-        preparar_df_exportacion(df_inbody_export).to_excel(writer, sheet_name="02_Composicion", index=False)
-        preparar_df_exportacion(df_eval_export).to_excel(writer, sheet_name="03_Evaluaciones", index=False)
-        preparar_df_exportacion(df_analisis).to_excel(writer, sheet_name="04_Analisis", index=False)
-        preparar_df_exportacion(df_medicacion_export).to_excel(writer, sheet_name="05_Medicacion", index=False)
-
-        workbook = writer.book
-        for nombre_hoja in workbook.sheetnames:
-            _formatear_hoja_excel(workbook[nombre_hoja])
-
-    output.seek(0)
-    return output
+    return df_final
 
 
 # =========================================================
