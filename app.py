@@ -1264,7 +1264,7 @@ def generar_excel_paciente(ficha, df_peso, df_inbody, df_eval, df_medicacion):
             "Estado"
         ])
 
-    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+with pd.ExcelWriter(output, engine="openpyxl") as writer:
 
     # hoja actual
     preparar_df_exportacion(df_estadistico).to_excel(
