@@ -1261,13 +1261,13 @@ def generar_pdf_paciente(ficha, df_peso, df_inbody, df_eval, df_medicacion):
     ))
     story.append(Spacer(1, 0.35 * cm))
 
-    story.append(Paragraph("Historial de medicación", styles["SubTitulo"]))
+    story.append(Paragraph("Análisis integrado", styles["SubTitulo"]))
     story.append(_tabla_pdf_desde_df(
-        df_medicacion_pdf,
-        columnas=["fecha_cambio", "droga", "dosis", "unidad", "frecuencia", "via_administracion", "estado", "observaciones"],
-        titulos=["Fecha", "Droga", "Dosis", "Unidad", "Frecuencia", "Vía", "Estado", "Observaciones"],
-        anchos_cm=[2.2, 3.3, 1.6, 1.5, 2.3, 2.1, 1.8, 3.2],
-        styles=styles
+    df_analisis_pdf,
+    columnas=["Fecha", "Evento", "Resultado", "Percentil", "Diagnostico", "Tratamiento"],
+    titulos=["Fecha", "Evento", "Resultado", "Percentil", "Diagnóstico", "Tratamiento"],
+    anchos_cm=[2.0, 3.4, 4.2, 1.5, 2.8, 3.6],
+    styles=styles
     ))
     story.append(Spacer(1, 0.35 * cm))
 
