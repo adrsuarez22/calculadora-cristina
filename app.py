@@ -247,6 +247,38 @@ def guardar_peso(paciente_id, fecha_medicion, peso_kg, talla_m):
     return supabase.table("seguimiento_peso").insert(payload).execute()
 
 
+def guardar_medicacion(
+    paciente_id,
+    fecha_cambio,
+    droga,
+    dosis,
+    unidad,
+    frecuencia,
+    via_administracion,
+    estado,
+    observaciones
+):
+    if paciente_id is None:
+        raise ValueError("No se encontró el id del paciente.")
+
+    if not str(droga).strip():
+        raise ValueError("La droga es obligatoria.")
+
+    payload = {
+        "paciente_id": int(paciente_id),
+        "fecha_cambio": str(fecha_cambio),
+        "droga": str(droga).strip(),
+        "dosis": float(dosis) if dosis is not None else None,
+        "unidad": str(unidad).strip() if unidad else None,
+        "frecuencia": str(frecuencia).strip() if frecuencia else None,
+        "via_administracion": str(via_administracion).strip() if via_administracion else None,
+        "estado": str(estado).strip() if estado else "Activa",
+        "observaciones": str(observaciones).strip() if observaciones else None
+    }
+
+    return supabase.table("medicacion_evolucion").insert(payload).execute()
+
+
 def clasificar_imc(imc_calculado):
     if imc_calculado < 18.5:
         return "Bajo peso", "🔵"
@@ -296,6 +328,43 @@ def obtener_historial_peso(paciente_id):
     except Exception as e:
         st.error(f"Error al leer historial de peso: {e}")
         return pd.DataFrame(columns=["fecha", "peso_kg", "imc"])
+
+
+def obtener_historial_medicacion(paciente_id):
+    try:
+        respuesta = (
+            supabase.table("medicacion_evolucion")
+            .select("*")
+            .eq("paciente_id", int(paciente_id))
+            .order("fecha_cambio", desc=True)
+            .execute()
+        )
+
+        if respuesta.data:
+            return pd.DataFrame(respuesta.data)
+
+        return pd.DataFrame(columns=[
+            "fecha_cambio",
+            "droga",
+            "dosis",
+            "unidad",
+            "frecuencia",
+            "via_administracion",
+            "estado",
+            "observaciones"
+        ])
+    except Exception as e:
+        st.error(f"Error al leer historial de medicación: {e}")
+        return pd.DataFrame(columns=[
+            "fecha_cambio",
+            "droga",
+            "dosis",
+            "unidad",
+            "frecuencia",
+            "via_administracion",
+            "estado",
+            "observaciones"
+        ])
 
 
 def obtener_pacientes():
@@ -906,7 +975,7 @@ def _formatear_hoja_excel(ws):
             cell.alignment = Alignment(vertical="top", wrap_text=True)
 
 
-def generar_excel_paciente(ficha, df_peso, df_inbody, df_eval):
+def generar_excel_paciente(ficha, df_peso, df_inbody, df_eval, df_medicacion):
     output = BytesIO()
 
     ficha_df = pd.DataFrame([{
@@ -929,6 +998,7 @@ def generar_excel_paciente(ficha, df_peso, df_inbody, df_eval):
     )
     df_inbody_export = agregar_identificacion_paciente(df_inbody_enriquecido, ficha, "Composicion_Corporal")
     df_eval_export = agregar_identificacion_paciente(df_eval, ficha, "Evaluaciones")
+    df_medicacion_export = agregar_identificacion_paciente(df_medicacion, ficha, "Medicacion")
 
     df_analisis = generar_df_analisis_cientifico(
         ficha=ficha,
@@ -946,6 +1016,7 @@ def generar_excel_paciente(ficha, df_peso, df_inbody, df_eval):
         preparar_df_exportacion(df_inbody_export).to_excel(writer, sheet_name="02_Composicion", index=False)
         preparar_df_exportacion(df_eval_export).to_excel(writer, sheet_name="03_Evaluaciones", index=False)
         preparar_df_exportacion(df_analisis).to_excel(writer, sheet_name="04_Analisis", index=False)
+        preparar_df_exportacion(df_medicacion_export).to_excel(writer, sheet_name="05_Medicacion", index=False)
 
         workbook = writer.book
         for nombre_hoja in workbook.sheetnames:
@@ -1014,7 +1085,7 @@ def _tabla_pdf_desde_df(df, columnas, titulos, anchos_cm, styles):
     return tabla
 
 
-def generar_pdf_paciente(ficha, df_peso, df_inbody, df_eval):
+def generar_pdf_paciente(ficha, df_peso, df_inbody, df_eval, df_medicacion):
     buffer = BytesIO()
 
     doc = SimpleDocTemplate(
@@ -1044,6 +1115,9 @@ def generar_pdf_paciente(ficha, df_peso, df_inbody, df_eval):
 
     df_peso_pdf = _df_para_pdf(df_peso)
     df_inbody_pdf = _df_para_pdf(df_inbody)
+    df_eval_pdf = _df_para_pdf(df_eval)
+    df_medicacion_pdf = _df_para_pdf(df_medicacion)
+
     if not df_inbody_pdf.empty:
         df_inbody_pdf = enriquecer_historial_corporal(
             df_inbody_pdf,
@@ -1051,8 +1125,6 @@ def generar_pdf_paciente(ficha, df_peso, df_inbody, df_eval):
             ficha["talla_m"]
         )
         df_inbody_pdf = _df_para_pdf(df_inbody_pdf)
-
-    df_eval_pdf = _df_para_pdf(df_eval)
 
     if df_inbody_pdf is not None and not df_inbody_pdf.empty:
         ultimo_corporal = df_inbody_pdf.copy()
@@ -1111,6 +1183,16 @@ def generar_pdf_paciente(ficha, df_peso, df_inbody, df_eval):
         columnas=["fecha", "prueba", "valor_medido", "percentil", "clasificacion"],
         titulos=["Fecha", "Prueba", "Valor", "Percentil", "Clasificación"],
         anchos_cm=[2.8, 5.7, 2.2, 2.0, 3.5],
+        styles=styles
+    ))
+    story.append(Spacer(1, 0.35 * cm))
+
+    story.append(Paragraph("Historial de medicación", styles["SubTitulo"]))
+    story.append(_tabla_pdf_desde_df(
+        df_medicacion_pdf,
+        columnas=["fecha_cambio", "droga", "dosis", "unidad", "frecuencia", "via_administracion", "estado", "observaciones"],
+        titulos=["Fecha", "Droga", "Dosis", "Unidad", "Frecuencia", "Vía", "Estado", "Observaciones"],
+        anchos_cm=[2.2, 3.3, 1.6, 1.5, 2.3, 2.1, 1.8, 3.2],
         styles=styles
     ))
 
@@ -1361,9 +1443,22 @@ ficha = obtener_ficha_paciente(paciente_nombre)
 df_peso_export = obtener_historial_peso(paciente_id) if paciente_id is not None else pd.DataFrame()
 df_inbody_export = obtener_historial_inbody(paciente_id) if paciente_id is not None else pd.DataFrame()
 df_eval_export = obtener_historial_paciente(paciente_nombre) if paciente_nombre else pd.DataFrame()
+df_medicacion_export = obtener_historial_medicacion(paciente_id) if paciente_id is not None else pd.DataFrame()
 
-excel_buffer = generar_excel_paciente(ficha, df_peso_export, df_inbody_export, df_eval_export)
-pdf_buffer = generar_pdf_paciente(ficha, df_peso_export, df_inbody_export, df_eval_export)
+excel_buffer = generar_excel_paciente(
+    ficha,
+    df_peso_export,
+    df_inbody_export,
+    df_eval_export,
+    df_medicacion_export
+)
+pdf_buffer = generar_pdf_paciente(
+    ficha,
+    df_peso_export,
+    df_inbody_export,
+    df_eval_export,
+    df_medicacion_export
+)
 
 with top2:
     st.download_button(
@@ -1744,6 +1839,115 @@ with right:
 st.divider()
 
 # =========================================================
+# MEDICACIÓN
+# =========================================================
+st.markdown("## Medicación")
+
+m1, m2 = st.columns([1, 1])
+
+with m1:
+    with st.container(border=True):
+        st.markdown("### Cargar medicación")
+
+        fecha_cambio = st.date_input(
+            "Fecha de cambio",
+            value=date.today(),
+            key=f"med_fecha_{paciente_id}"
+        )
+
+        col_m1, col_m2 = st.columns(2)
+
+        with col_m1:
+            droga = st.text_input("Droga", key=f"med_droga_{paciente_id}")
+            dosis = st.number_input(
+                "Dosis",
+                min_value=0.0,
+                max_value=99999.0,
+                step=0.1,
+                format="%.2f",
+                key=f"med_dosis_{paciente_id}"
+            )
+            unidad = st.text_input(
+                "Unidad",
+                placeholder="mg / mcg / ml / comprimidos",
+                key=f"med_unidad_{paciente_id}"
+            )
+
+        with col_m2:
+            frecuencia = st.text_input(
+                "Frecuencia",
+                placeholder="Cada 24 h / Cada 12 h",
+                key=f"med_frecuencia_{paciente_id}"
+            )
+            via_administracion = st.selectbox(
+                "Vía de administración",
+                ["Oral", "Subcutánea", "Intravenosa", "Intramuscular", "Tópica", "Inhalatoria", "Otra"],
+                key=f"med_via_{paciente_id}"
+            )
+            estado_medicacion = st.selectbox(
+                "Estado",
+                ["Activa", "Modificada", "Suspendida"],
+                key=f"med_estado_{paciente_id}"
+            )
+
+        observaciones_medicacion = st.text_area(
+            "Observaciones",
+            key=f"med_obs_{paciente_id}"
+        )
+
+        if st.button("Guardar medicación", key=f"btn_guardar_medicacion_{paciente_id}"):
+            try:
+                guardar_medicacion(
+                    paciente_id=paciente_id,
+                    fecha_cambio=fecha_cambio,
+                    droga=droga,
+                    dosis=dosis,
+                    unidad=unidad,
+                    frecuencia=frecuencia,
+                    via_administracion=via_administracion,
+                    estado=estado_medicacion,
+                    observaciones=observaciones_medicacion
+                )
+                st.success("Medicación guardada correctamente.")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Error al guardar medicación: {e}")
+
+with m2:
+    with st.container(border=True):
+        st.markdown("### Historial de medicación")
+
+        df_medicacion = obtener_historial_medicacion(paciente_id)
+
+        if not df_medicacion.empty:
+            if "fecha_cambio" in df_medicacion.columns:
+                df_medicacion["fecha_cambio"] = pd.to_datetime(df_medicacion["fecha_cambio"], errors="coerce")
+                df_medicacion = df_medicacion.sort_values("fecha_cambio", ascending=False)
+                df_medicacion["fecha_cambio"] = df_medicacion["fecha_cambio"].dt.strftime("%Y-%m-%d")
+
+            columnas_medicacion = [
+                "fecha_cambio",
+                "droga",
+                "dosis",
+                "unidad",
+                "frecuencia",
+                "via_administracion",
+                "estado",
+                "observaciones"
+            ]
+            columnas_medicacion = [c for c in columnas_medicacion if c in df_medicacion.columns]
+
+            st.dataframe(
+                df_medicacion[columnas_medicacion],
+                use_container_width=True,
+                hide_index=True
+            )
+        else:
+            st.info("Sin historial de medicación.")
+
+st.divider()
+
+# =========================================================
 # HISTORIALES
 # =========================================================
 h1, h2 = st.columns([1, 1])
@@ -1867,19 +2071,29 @@ with g1:
             df_peso["imc"] = pd.to_numeric(df_peso["imc"], errors="coerce")
             df_peso = df_peso.dropna(subset=["fecha", "peso_kg", "imc"]).sort_values("fecha", ascending=True)
 
-            grafico_doble = alt.Chart(df_peso).transform_fold(
-                ["peso_kg", "imc"],
-                as_=["variable", "valor"]
-            ).mark_line(point=True).encode(
-                x=alt.X("yearmonthdate(fecha):T", title="Fecha"),
-                y=alt.Y("valor:Q", title="Valor"),
-                color=alt.Color("variable:N", title="Serie"),
-                tooltip=[
-                    alt.Tooltip("yearmonthdate(fecha):T", title="Fecha"),
-                    alt.Tooltip("variable:N", title="Serie"),
-                    alt.Tooltip("valor:Q", title="Valor", format=".2f")
-                ]
-            ).properties(height=320)
+            grafico_doble = (
+                alt.Chart(df_peso)
+                .transform_fold(
+                    ["peso_kg", "imc"],
+                    as_=["variable", "valor"]
+                )
+                .mark_line(point=True)
+                .encode(
+                    x=alt.X("yearmonthdate(fecha):T", title="Fecha"),
+                    y=alt.Y(
+                        "valor:Q",
+                        title="Valor",
+                        scale=alt.Scale(domainMin=0)
+                    ),
+                    color=alt.Color("variable:N", title="Serie"),
+                    tooltip=[
+                        alt.Tooltip("yearmonthdate(fecha):T", title="Fecha"),
+                        alt.Tooltip("variable:N", title="Serie"),
+                        alt.Tooltip("valor:Q", title="Valor", format=".2f")
+                    ]
+                )
+                .properties(height=320)
+            )
 
             st.altair_chart(grafico_doble, use_container_width=True)
         else:
@@ -1921,12 +2135,19 @@ with g2:
                         title="Fecha",
                         axis=alt.Axis(format="%d-%m-%Y")
                     ),
-                    y=alt.Y("percentil:Q", title="Percentil")
+                    y=alt.Y(
+                        "percentil:Q",
+                        title="Percentil",
+                        scale=alt.Scale(domain=[0, 100])
+                    )
                 )
 
                 puntos = alt.Chart(df_prueba).mark_circle(size=90).encode(
                     x=alt.X("yearmonthdate(fecha):T"),
-                    y=alt.Y("percentil:Q")
+                    y=alt.Y(
+                        "percentil:Q",
+                        scale=alt.Scale(domain=[0, 100])
+                    )
                 )
 
                 etiquetas = alt.Chart(df_prueba).mark_text(
@@ -1934,7 +2155,10 @@ with g2:
                     fontSize=12
                 ).encode(
                     x=alt.X("yearmonthdate(fecha):T"),
-                    y=alt.Y("percentil:Q"),
+                    y=alt.Y(
+                        "percentil:Q",
+                        scale=alt.Scale(domain=[0, 100])
+                    ),
                     text="Etiqueta:N"
                 )
 
