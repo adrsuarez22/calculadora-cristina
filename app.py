@@ -13,7 +13,7 @@ from io import BytesIO
 st.set_page_config(
     page_title="Calculadora de Condición Física",
     page_icon="💪",
-    layout="centered"
+    layout="wide"
 )
 
 st.markdown("""
@@ -28,6 +28,37 @@ st.markdown("""
 
 [data-testid="stToolbar"] {
     right: 1rem;
+}
+
+.block-container {
+    padding-top: 1.5rem;
+    padding-bottom: 2rem;
+    max-width: 1200px;
+}
+
+.result-card {
+    padding: 14px 16px;
+    border-radius: 10px;
+    font-size: 18px;
+    font-weight: 700;
+    margin-top: 8px;
+    margin-bottom: 10px;
+}
+
+.motivo-box {
+    background-color: #ffffff;
+    border: 1px solid #e6e9ef;
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-bottom: 12px;
+}
+
+.reco-box {
+    background-color: #eef7ef;
+    border: 1px solid #d4ead7;
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-bottom: 14px;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -314,7 +345,7 @@ def obtener_historial_inbody(paciente_id):
         return pd.DataFrame()
 
     except Exception as e:
-        st.error(f"Error al leer historial InBody: {e}")
+        st.error(f"Error al leer historial de composición corporal: {e}")
         return pd.DataFrame()
 
 
@@ -412,7 +443,7 @@ def generar_excel_paciente(ficha, df_peso, df_inbody, df_eval):
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
         preparar_df_exportacion(ficha_df).to_excel(writer, sheet_name="Ficha", index=False)
         preparar_df_exportacion(df_peso).to_excel(writer, sheet_name="Peso_IMC", index=False)
-        preparar_df_exportacion(df_inbody).to_excel(writer, sheet_name="InBody", index=False)
+        preparar_df_exportacion(df_inbody).to_excel(writer, sheet_name="Composicion_Corporal", index=False)
         preparar_df_exportacion(df_eval).to_excel(writer, sheet_name="Evaluaciones", index=False)
 
     output.seek(0)
@@ -490,7 +521,7 @@ def generar_pdf_paciente(ficha, df_peso, df_inbody, df_eval):
     )
 
     y = escribir_bloque_pdf(
-        pdf, y, "Historial InBody",
+        pdf, y, "Historial de composición corporal",
         df_inbody_pdf,
         ["fecha", "peso_kg", "imc", "grasa_corporal_pct", "masa_muscular_kg", "agua_corporal_pct"],
         [70, 65, 55, 80, 80, 80]
@@ -509,7 +540,213 @@ def generar_pdf_paciente(ficha, df_peso, df_inbody, df_eval):
 
 
 # =========================================================
-# UTILIDADES CLÍNICAS
+# UTILIDADES CLÍNICAS - COMPOSICIÓN CORPORAL
+# =========================================================
+def clasificacion_grasa_corporal(sexo, grasa_pct):
+    sexo = str(sexo).strip().lower()
+
+    if grasa_pct is None:
+        return "Sin clasificar"
+
+    if sexo == "hombre":
+        if grasa_pct < 8:
+            return "Muy bajo"
+        elif grasa_pct < 19:
+            return "Normal"
+        elif grasa_pct <= 25:
+            return "Alto"
+        else:
+            return "Obesidad"
+
+    if sexo == "mujer":
+        if grasa_pct < 21:
+            return "Muy bajo"
+        elif grasa_pct < 33:
+            return "Normal"
+        elif grasa_pct <= 39:
+            return "Alto"
+        else:
+            return "Obesidad"
+
+    return "Sin clasificar"
+
+
+def clasificacion_agua_corporal(sexo, agua_pct):
+    sexo = str(sexo).strip().lower()
+
+    if agua_pct is None:
+        return "Sin clasificar"
+
+    if sexo == "hombre":
+        if agua_pct < 50:
+            return "Bajo"
+        elif agua_pct <= 65:
+            return "Normal"
+        else:
+            return "Alto"
+
+    if sexo == "mujer":
+        if agua_pct < 45:
+            return "Bajo"
+        elif agua_pct <= 60:
+            return "Normal"
+        else:
+            return "Alto"
+
+    return "Sin clasificar"
+
+
+def clasificacion_grasa_visceral(grasa_visceral):
+    if grasa_visceral is None:
+        return "Sin clasificar"
+
+    if grasa_visceral <= 9:
+        return "Normal"
+    elif grasa_visceral <= 14:
+        return "Alto"
+    else:
+        return "Muy alto"
+
+
+def calcular_masa_muscular_relativa_pct(peso_kg, masa_muscular_kg):
+    if peso_kg is None or masa_muscular_kg is None:
+        return None
+    if float(peso_kg) <= 0:
+        return None
+    return round((float(masa_muscular_kg) / float(peso_kg)) * 100, 2)
+
+
+def clasificacion_masa_muscular_relativa(sexo, musculo_relativo_pct):
+    sexo = str(sexo).strip().lower()
+
+    if musculo_relativo_pct is None:
+        return "Sin clasificar"
+
+    if sexo == "hombre":
+        if musculo_relativo_pct < 33:
+            return "Bajo"
+        elif musculo_relativo_pct <= 39:
+            return "Normal"
+        else:
+            return "Alto"
+
+    if sexo == "mujer":
+        if musculo_relativo_pct < 24:
+            return "Bajo"
+        elif musculo_relativo_pct <= 30:
+            return "Normal"
+        else:
+            return "Alto"
+
+    return "Sin clasificar"
+
+
+def color_estado_corporal(estado):
+    mapa = {
+        "Normal": ("#2e7d32", "#ffffff"),
+        "Bajo peso": ("#1976d2", "#ffffff"),
+        "Riesgo sarcopénico": ("#ef6c00", "#ffffff"),
+        "Sobrepeso": ("#f9a825", "#1f1f1f"),
+        "Sobrepeso muscular": ("#00897b", "#ffffff"),
+        "Obesidad": ("#c62828", "#ffffff"),
+        "Riesgo cardiometabólico": ("#ad1457", "#ffffff"),
+        "Riesgo cardiometabólico moderado": ("#6a1b9a", "#ffffff"),
+        "Sin clasificar": ("#757575", "#ffffff")
+    }
+    return mapa.get(estado, ("#757575", "#ffffff"))
+
+
+def generar_recomendacion_corporal(estado, clasif_grasa, clasif_visceral, clasif_musculo):
+    if estado in ["Obesidad", "Riesgo cardiometabólico", "Riesgo cardiometabólico moderado"]:
+        return "Programa de reducción de grasa + ejercicio de fuerza + control cardiometabólico."
+    if estado == "Riesgo sarcopénico":
+        return "Priorizar ejercicio de fuerza, aumento de masa muscular y seguimiento funcional."
+    if estado == "Sobrepeso muscular":
+        return "Mantener masa muscular, controlar evolución y ajustar plan nutricional según objetivo."
+    if estado == "Sobrepeso":
+        return "Plan de control de peso con actividad física regular y seguimiento de composición corporal."
+    if estado == "Bajo peso":
+        return "Evaluar aporte nutricional y preservar o mejorar masa muscular."
+    if estado == "Normal":
+        if clasif_musculo == "Bajo":
+            return "Estado general aceptable, pero conviene reforzar trabajo de fuerza."
+        return "Mantener hábitos actuales y seguimiento periódico."
+    return "Completar datos clínicos y repetir control."
+
+
+def evaluar_perfil_morfofuncional(sexo, peso_kg, talla_m, grasa_pct, masa_muscular_kg, agua_pct, grasa_visceral):
+    imc = round(float(peso_kg) / (float(talla_m) ** 2), 2) if peso_kg and talla_m else None
+    clasif_imc = clasificar_imc(imc)[0] if imc is not None else "Sin clasificar"
+    clasif_grasa = clasificacion_grasa_corporal(sexo, grasa_pct)
+    clasif_agua = clasificacion_agua_corporal(sexo, agua_pct)
+    clasif_visceral = clasificacion_grasa_visceral(grasa_visceral)
+    musculo_rel_pct = calcular_masa_muscular_relativa_pct(peso_kg, masa_muscular_kg)
+    clasif_musculo = clasificacion_masa_muscular_relativa(sexo, musculo_rel_pct)
+
+    motivos = []
+
+    if clasif_imc == "Bajo peso":
+        motivos.append("IMC en rango de bajo peso")
+    elif clasif_imc == "Sobrepeso":
+        motivos.append("IMC en rango de sobrepeso")
+    elif clasif_imc == "Obesidad":
+        motivos.append("IMC en rango de obesidad")
+
+    if clasif_grasa in ["Alto", "Obesidad"]:
+        motivos.append("% grasa corporal elevada")
+
+    if clasif_visceral in ["Alto", "Muy alto"]:
+        motivos.append(f"grasa visceral {clasif_visceral.lower()}")
+
+    if clasif_musculo == "Bajo":
+        motivos.append("masa muscular relativa baja")
+    elif clasif_musculo == "Normal":
+        motivos.append("masa muscular relativa normal")
+    elif clasif_musculo == "Alto":
+        motivos.append("masa muscular relativa alta")
+
+    estado = "Normal"
+
+    if clasif_visceral == "Muy alto":
+        estado = "Riesgo cardiometabólico"
+    elif clasif_visceral == "Alto" and clasif_grasa in ["Alto", "Obesidad"]:
+        estado = "Riesgo cardiometabólico moderado"
+    elif clasif_imc == "Obesidad" or (clasif_imc in ["Sobrepeso", "Obesidad"] and clasif_grasa == "Obesidad"):
+        estado = "Obesidad"
+    elif clasif_imc == "Sobrepeso" and clasif_grasa in ["Alto", "Obesidad"] and clasif_musculo != "Alto":
+        estado = "Sobrepeso"
+    elif clasif_imc == "Sobrepeso" and clasif_musculo == "Alto" and clasif_grasa == "Normal":
+        estado = "Sobrepeso muscular"
+    elif clasif_imc == "Normal" and clasif_musculo == "Bajo":
+        estado = "Riesgo sarcopénico"
+    elif clasif_imc == "Bajo peso":
+        estado = "Bajo peso"
+    else:
+        estado = "Normal"
+
+    recomendacion = generar_recomendacion_corporal(
+        estado=estado,
+        clasif_grasa=clasif_grasa,
+        clasif_visceral=clasif_visceral,
+        clasif_musculo=clasif_musculo
+    )
+
+    return {
+        "imc": imc,
+        "clasif_imc": clasif_imc,
+        "clasif_grasa": clasif_grasa,
+        "clasif_agua": clasif_agua,
+        "clasif_visceral": clasif_visceral,
+        "musculo_rel_pct": musculo_rel_pct,
+        "clasif_musculo": clasif_musculo,
+        "estado": estado,
+        "motivos": motivos,
+        "recomendacion": recomendacion
+    }
+
+
+# =========================================================
+# UTILIDADES CLÍNICAS - FUNCIONALES
 # =========================================================
 def clasificar_percentil(percentil):
     if percentil is None:
@@ -921,23 +1158,25 @@ else:
 st.divider()
 
 # =========================================================
-# INBODY
+# COMPOSICIÓN CORPORAL
 # =========================================================
-st.markdown("## Composición corporal (InBody)")
+st.markdown("## Composición corporal")
 
 if ficha["talla_m"] is None or float(ficha["talla_m"]) <= 0:
-    st.warning("Para cargar InBody primero hay que tener una talla válida en el paciente.")
+    st.warning("Para cargar composición corporal primero hay que tener una talla válida en el paciente.")
 else:
-    col_i1, col_i2 = st.columns(2)
+    sexo_corporal = str(ficha["sexo"]).strip().lower()
 
-    with col_i1:
+    col_c1, col_c2 = st.columns(2)
+
+    with col_c1:
         fecha_inbody = st.date_input("Fecha estudio", value=date.today(), key=f"inbody_fecha_{paciente_id}")
         peso_inbody = st.number_input("Peso (kg)", min_value=0.0, max_value=300.0, step=0.1, key=f"inbody_peso_{paciente_id}")
         imc_inbody_calc = round(float(peso_inbody) / (float(ficha["talla_m"]) ** 2), 2) if peso_inbody and ficha["talla_m"] else 0.0
         st.markdown(f"**IMC calculado:** {imc_inbody_calc:.2f}")
         grasa_pct = st.number_input("% grasa corporal", min_value=0.0, max_value=80.0, step=0.1, key=f"inbody_grasa_{paciente_id}")
 
-    with col_i2:
+    with col_c2:
         masa_muscular = st.number_input("Masa muscular (kg)", min_value=0.0, max_value=100.0, step=0.1, key=f"inbody_musculo_{paciente_id}")
         agua_pct = st.number_input("% agua corporal", min_value=0.0, max_value=100.0, step=0.1, key=f"inbody_agua_{paciente_id}")
         grasa_visceral = st.number_input("Grasa visceral", min_value=0.0, max_value=30.0, step=0.1, key=f"inbody_visceral_{paciente_id}")
@@ -945,7 +1184,70 @@ else:
 
     observaciones_inbody = st.text_area("Observaciones", key=f"inbody_obs_{paciente_id}")
 
-    if st.button("Guardar estudio InBody", key=f"guardar_inbody_{paciente_id}"):
+    resultado_corporal = evaluar_perfil_morfofuncional(
+        sexo=sexo_corporal,
+        peso_kg=peso_inbody,
+        talla_m=ficha["talla_m"],
+        grasa_pct=grasa_pct,
+        masa_muscular_kg=masa_muscular,
+        agua_pct=agua_pct,
+        grasa_visceral=grasa_visceral
+    )
+
+    bg_estado, fg_estado = color_estado_corporal(resultado_corporal["estado"])
+
+    st.markdown("### Resultado corporal")
+    st.markdown(
+        f"""
+        <div class="result-card" style="background-color:{bg_estado}; color:{fg_estado};">
+            Estado corporal: {resultado_corporal["estado"]}
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    col_r1, col_r2, col_r3 = st.columns(3)
+    with col_r1:
+        st.write(f"**IMC:** {resultado_corporal['imc'] if resultado_corporal['imc'] is not None else '-'}")
+        st.write(f"**Clasificación IMC:** {resultado_corporal['clasif_imc']}")
+        st.write(f"**% grasa:** {resultado_corporal['clasif_grasa']}")
+
+    with col_r2:
+        st.write(f"**% agua corporal:** {resultado_corporal['clasif_agua']}")
+        st.write(f"**Grasa visceral:** {resultado_corporal['clasif_visceral']}")
+        st.write(f"**Músculo relativo %:** {resultado_corporal['musculo_rel_pct'] if resultado_corporal['musculo_rel_pct'] is not None else '-'}")
+
+    with col_r3:
+        st.write(f"**Clasificación muscular:** {resultado_corporal['clasif_musculo']}")
+        st.write(f"**Metabolismo basal:** {metabolismo if metabolismo is not None else '-'}")
+        st.write(f"**Sexo de referencia:** {sexo_corporal.capitalize() if sexo_corporal else '-'}")
+
+    motivos_texto = resultado_corporal["motivos"] if resultado_corporal["motivos"] else ["Sin hallazgos relevantes"]
+    motivos_html = "".join([f"<li>{m}</li>" for m in motivos_texto])
+
+    st.markdown(
+        f"""
+        <div class="motivo-box">
+            <b>Motivos:</b>
+            <ul style="margin-top:8px; margin-bottom:0;">
+                {motivos_html}
+            </ul>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    st.markdown(
+        f"""
+        <div class="reco-box">
+            <b>Recomendación:</b><br>
+            {resultado_corporal["recomendacion"]}
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    if st.button("Guardar composición corporal", key=f"guardar_inbody_{paciente_id}"):
         try:
             guardar_inbody(
                 paciente_id=paciente_id,
@@ -960,11 +1262,11 @@ else:
                 observaciones=observaciones_inbody
             )
 
-            st.success("Estudio InBody guardado correctamente")
+            st.success("Composición corporal guardada correctamente")
             st.rerun()
 
         except Exception as e:
-            st.error(f"Error al guardar InBody: {e}")
+            st.error(f"Error al guardar composición corporal: {e}")
 
     df_inbody = obtener_historial_inbody(paciente_id)
 
@@ -983,9 +1285,9 @@ else:
             st.markdown(f"**Última masa muscular:** {ultimo_inbody.get('masa_muscular_kg', '')}")
 
         with c_i3:
-            st.markdown(f"**Última fecha InBody:** {ultimo_inbody['fecha'].strftime('%d-%m-%Y')}")
+            st.markdown(f"**Última fecha:** {ultimo_inbody['fecha'].strftime('%d-%m-%Y')}")
 
-        st.markdown("### Historial InBody")
+        st.markdown("### Historial de composición corporal")
         df_inbody_mostrar = df_inbody.copy()
         if "fecha" in df_inbody_mostrar.columns:
             df_inbody_mostrar["fecha"] = df_inbody_mostrar["fecha"].dt.strftime("%Y-%m-%d")
@@ -1014,6 +1316,8 @@ st.divider()
 # =========================================================
 # FORMULARIO FUNCIONAL
 # =========================================================
+st.markdown("## Evaluación funcional")
+
 paciente_sexo_guardado = next((p["sexo"] for p in pacientes if p["nombre"] == paciente_nombre), None)
 
 prueba = st.selectbox(
@@ -1084,7 +1388,7 @@ percentil, clasificacion, referencia_p50, referencia_altura, referencia_edad = c
 )
 
 # =========================================================
-# RESULTADO
+# RESULTADO FUNCIONAL
 # =========================================================
 color = color_clasificacion(clasificacion)
 
