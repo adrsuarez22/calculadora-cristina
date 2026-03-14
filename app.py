@@ -2135,12 +2135,7 @@ with g2:
 
             if filtro_historial != "Todas":
                 prueba_grafico = filtro_historial
-                st.text_input(
-                    "Prueba para gráfico",
-                    value=prueba_grafico,
-                    disabled=True,
-                    key="prueba_grafico_bloqueada"
-                )
+                st.markdown(f"**Prueba para gráfico:** {prueba_grafico}")
             else:
                 prueba_grafico = st.selectbox(
                     "Prueba para gráfico",
