@@ -2004,14 +2004,16 @@ with h2:
     df_historial = obtener_historial_paciente(paciente_nombre)
 
     if not df_historial.empty:
-        filtro_historial_global = st.selectbox(
-    "Filtrar historial por prueba",
-    options=["Todas", "Caminata 6 minutos", "Prensión manual", "Levantarse de la silla"],
-    index=0,
-    key="filtro_historial_prueba"
-)
 
-prueba_filtro = filtro_historial_global
+        filtro_historial_global = st.selectbox(
+            "Filtrar historial por prueba",
+            options=["Todas", "Caminata 6 minutos", "Prensión manual", "Levantarse de la silla"],
+            index=0,
+            key="filtro_historial_prueba"
+        )
+
+        prueba_filtro = filtro_historial_global
+
         if prueba_filtro == "Todas":
             df_historial_filtrado = df_historial.copy()
         else:
@@ -2021,6 +2023,7 @@ prueba_filtro = filtro_historial_global
 
         columnas_mostrar = ["id", "fecha", "prueba", "valor_medido", "percentil", "clasificacion"]
         columnas_existentes = [c for c in columnas_mostrar if c in df_historial_filtrado.columns]
+
         df_historial_mostrar = df_historial_filtrado[columnas_existentes].copy()
 
         if "fecha" in df_historial_mostrar.columns:
@@ -2034,6 +2037,7 @@ prueba_filtro = filtro_historial_global
         st.markdown("**Fecha | Prueba | Valor | Percentil | Clasificación | Eliminar**")
 
         for _, row in df_historial_mostrar.iterrows():
+
             c1, c2, c3, c4, c5, c6 = st.columns([1, 2, 1, 1, 1, 0.5])
 
             c1.write(row.get("fecha", ""))
@@ -2049,6 +2053,7 @@ prueba_filtro = filtro_historial_global
                     st.rerun()
                 except Exception as e:
                     st.error(f"Error al eliminar: {e}")
+
     else:
         st.info("Sin historial funcional.")
 
