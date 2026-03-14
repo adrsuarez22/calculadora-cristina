@@ -200,7 +200,7 @@ def guardar_evaluacion(paciente_nombre, sexo, edad, prueba, valor_medido, percen
     return supabase.table("evaluaciones").insert(payload).execute()
 
 
-def guardar_paciente(nombre, sexo, talla_m):
+guardar_paciente(nuevo_nombre, nuevo_sexo, nueva_fecha_nacimiento, nueva_talla)
     nombre_limpio = str(nombre).strip()
     sexo_limpio = str(sexo).strip().lower()
 
@@ -220,8 +220,10 @@ def guardar_paciente(nombre, sexo, talla_m):
     payload = {
         "nombre": nombre_limpio,
         "sexo": sexo_limpio,
+        "fecha_nacimiento": str(fecha_nacimiento),
         "talla_m": round(float(talla_m), 2)
     }
+
     return supabase.table("pacientes").insert(payload).execute()
 
 
@@ -437,7 +439,7 @@ def obtener_ficha_paciente(paciente_nombre):
 
         respuesta_paciente = (
             supabase.table("pacientes")
-            .select("id,nombre,sexo,talla_m,created_at")
+            .select("id,nombre,sexo,fecha_nacimiento,talla_m,created_at")
             .eq("nombre", paciente_nombre)
             .limit(1)
             .execute()
@@ -471,6 +473,7 @@ def obtener_ficha_paciente(paciente_nombre):
             "id": datos_paciente.get("id"),
             "nombre": datos_paciente.get("nombre", paciente_nombre),
             "sexo": datos_paciente.get("sexo", "-"),
+            "fecha_nacimiento": datos_paciente.get("fecha_nacimiento"),
             "talla_m": datos_paciente.get("talla_m"),
             "cantidad_evaluaciones": cantidad_evaluaciones,
             "ultima_fecha": ultima_fecha,
@@ -1566,6 +1569,11 @@ st.title("Calculadora de Condición Física")
 with st.expander("➕ Nuevo paciente"):
     nuevo_nombre = st.text_input("Nombre del nuevo paciente", key="nuevo_nombre_alta")
     nuevo_sexo = st.selectbox("Sexo del nuevo paciente", ["hombre", "mujer"], key="nuevo_sexo_alta")
+    nueva_fecha_nacimiento = st.date_input(
+        "Fecha de nacimiento",
+        value=date(1980, 1, 1),
+        key="nueva_fecha_nacimiento_alta"
+    )
     nueva_talla = st.number_input(
         "Talla (m)",
         min_value=0.50,
