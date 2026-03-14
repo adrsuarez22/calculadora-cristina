@@ -2130,10 +2130,11 @@ with g2:
             df_graf_base["prueba"] = df_graf_base["prueba"].astype(str).str.strip()
             df_graf_base = df_graf_base.dropna(subset=["fecha", "percentil", "prueba"])
 
+            filtro_historial = st.session_state.get("filtro_historial_prueba", "Todas")
             opciones_prueba = ["Caminata 6 minutos", "Prensión manual", "Levantarse de la silla"]
 
-            if filtro_historial_global != "Todas":
-                prueba_grafico = filtro_historial_global
+            if filtro_historial != "Todas":
+                prueba_grafico = filtro_historial
                 st.text_input(
                     "Prueba para gráfico",
                     value=prueba_grafico,
