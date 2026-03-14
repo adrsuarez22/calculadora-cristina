@@ -85,8 +85,13 @@ SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 def eliminar_paciente(paciente_id):
-    resp = supabase.table("pacientes").delete().eq("id", paciente_id).execute()
-    return resp
+
+    resp = supabase.table("evaluaciones").select("id").eq("paciente_id", paciente_id).execute()
+
+    if len(resp.data) > 0:
+        raise Exception("El paciente tiene evaluaciones registradas")
+
+    supabase.table("pacientes").delete().eq("id", paciente_id).execute()
 # =========================================================
 # TABLAS NORMATIVAS
 # =========================================================
