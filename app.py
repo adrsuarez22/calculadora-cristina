@@ -1155,7 +1155,8 @@ def generar_tabla_estadistica(ficha, df_peso, df_inbody, df_eval, df_medicacion)
 
     df_final.insert(0, "PacienteID_Ficha", ficha.get("id"))
     df_final.insert(0, "Paciente", ficha.get("nombre"))
-
+    df_final.insert(2, "Sexo", ficha.get("sexo"))
+    df_final.insert(3, "FechaNacimiento", ficha.get("fecha_nacimiento"))
     return df_final
 
 
