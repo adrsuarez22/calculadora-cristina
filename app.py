@@ -814,7 +814,7 @@ def agregar_identificacion_paciente(df, ficha, origen=""):
     return df_out
 
 
-def generar_df_analisis_cientifico(ficha, df_peso, df_inbody, df_eval):
+def generar_df_analisis_cientifico(ficha, df_peso, df_inbody, df_eval, df_medicacion):
     filas = []
 
     nombre = ficha.get("nombre")
@@ -822,18 +822,68 @@ def generar_df_analisis_cientifico(ficha, df_peso, df_inbody, df_eval):
     talla_m = ficha.get("talla_m")
     paciente_id = ficha.get("id")
 
+    def obtener_medicacion_vigente(fecha_referencia):
+        if df_medicacion is None or df_medicacion.empty or pd.isna(fecha_referencia):
+            return "", ""
+
+        meds = df_medicacion.copy()
+
+        if "fecha_cambio" not in meds.columns:
+            return "", ""
+
+        meds["fecha_cambio"] = pd.to_datetime(meds["fecha_cambio"], errors="coerce")
+        fecha_ref = pd.to_datetime(fecha_referencia, errors="coerce")
+
+        meds = meds.dropna(subset=["fecha_cambio"])
+        meds = meds[meds["fecha_cambio"] <= fecha_ref]
+
+        if meds.empty:
+            return "", ""
+
+        meds = meds.sort_values("fecha_cambio", ascending=True)
+        ultima = meds.iloc[-1]
+
+        droga = str(ultima.get("droga", "")).strip()
+
+        dosis = ultima.get("dosis")
+        unidad = str(ultima.get("unidad", "")).strip()
+
+        dosis_txt = ""
+        if pd.notna(dosis):
+            try:
+                if float(dosis).is_integer():
+                    dosis_txt = str(int(float(dosis)))
+                else:
+                    dosis_txt = str(round(float(dosis), 2))
+            except Exception:
+                dosis_txt = str(dosis).strip()
+
+        if dosis_txt and unidad:
+            dosis_final = f"{dosis_txt} {unidad}"
+        elif dosis_txt:
+            dosis_final = dosis_txt
+        elif unidad:
+            dosis_final = unidad
+        else:
+            dosis_final = ""
+
+        return droga, dosis_final
+
     if df_peso is not None and not df_peso.empty:
         df_p = df_peso.copy()
         if "fecha" in df_p.columns:
             df_p["fecha"] = pd.to_datetime(df_p["fecha"], errors="coerce")
 
         for _, row in df_p.iterrows():
+            fecha_row = row.get("fecha")
+            droga_vigente, dosis_vigente = obtener_medicacion_vigente(fecha_row)
+
             filas.append({
                 "PacienteID": paciente_id,
                 "Paciente": nombre,
                 "Sexo": sexo,
                 "Talla_m": talla_m,
-                "Fecha": row.get("fecha"),
+                "Fecha": fecha_row,
                 "TipoRegistro": "Peso_IMC",
                 "Prueba": None,
                 "ValorMedido": None,
@@ -855,7 +905,9 @@ def generar_df_analisis_cientifico(ficha, df_peso, df_inbody, df_eval):
                 "DiagnosticoCorporal": None,
                 "SugerenciaCorporal": None,
                 "MotivosCorporal": None,
-                "Observaciones": None
+                "Observaciones": None,
+                "Droga_Vigente": droga_vigente,
+                "Dosis_Vigente": dosis_vigente
             })
 
     if df_inbody is not None and not df_inbody.empty:
@@ -864,12 +916,15 @@ def generar_df_analisis_cientifico(ficha, df_peso, df_inbody, df_eval):
             df_c["fecha"] = pd.to_datetime(df_c["fecha"], errors="coerce")
 
         for _, row in df_c.iterrows():
+            fecha_row = row.get("fecha")
+            droga_vigente, dosis_vigente = obtener_medicacion_vigente(fecha_row)
+
             filas.append({
                 "PacienteID": paciente_id,
                 "Paciente": nombre,
                 "Sexo": sexo,
                 "Talla_m": talla_m,
-                "Fecha": row.get("fecha"),
+                "Fecha": fecha_row,
                 "TipoRegistro": "Composicion_Corporal",
                 "Prueba": None,
                 "ValorMedido": None,
@@ -891,7 +946,9 @@ def generar_df_analisis_cientifico(ficha, df_peso, df_inbody, df_eval):
                 "DiagnosticoCorporal": row.get("diagnostico_corporal"),
                 "SugerenciaCorporal": row.get("sugerencia_corporal"),
                 "MotivosCorporal": row.get("motivos_corporal"),
-                "Observaciones": row.get("observaciones")
+                "Observaciones": row.get("observaciones"),
+                "Droga_Vigente": droga_vigente,
+                "Dosis_Vigente": dosis_vigente
             })
 
     if df_eval is not None and not df_eval.empty:
@@ -900,12 +957,15 @@ def generar_df_analisis_cientifico(ficha, df_peso, df_inbody, df_eval):
             df_f["fecha"] = pd.to_datetime(df_f["fecha"], errors="coerce")
 
         for _, row in df_f.iterrows():
+            fecha_row = row.get("fecha")
+            droga_vigente, dosis_vigente = obtener_medicacion_vigente(fecha_row)
+
             filas.append({
                 "PacienteID": paciente_id,
                 "Paciente": nombre,
                 "Sexo": sexo,
                 "Talla_m": talla_m,
-                "Fecha": row.get("fecha"),
+                "Fecha": fecha_row,
                 "TipoRegistro": "Evaluacion_Funcional",
                 "Prueba": row.get("prueba"),
                 "ValorMedido": row.get("valor_medido"),
@@ -927,14 +987,19 @@ def generar_df_analisis_cientifico(ficha, df_peso, df_inbody, df_eval):
                 "DiagnosticoCorporal": None,
                 "SugerenciaCorporal": None,
                 "MotivosCorporal": None,
-                "Observaciones": None
+                "Observaciones": None,
+                "Droga_Vigente": droga_vigente,
+                "Dosis_Vigente": dosis_vigente
             })
 
     df_final = pd.DataFrame(filas)
 
     if not df_final.empty:
         df_final["Fecha"] = pd.to_datetime(df_final["Fecha"], errors="coerce")
-        df_final = df_final.sort_values(["Paciente", "Fecha", "TipoRegistro"], ascending=[True, True, True]).reset_index(drop=True)
+        df_final = df_final.sort_values(
+            ["Paciente", "Fecha", "TipoRegistro"],
+            ascending=[True, True, True]
+        ).reset_index(drop=True)
 
     return df_final
 
