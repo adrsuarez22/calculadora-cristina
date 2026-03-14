@@ -1038,9 +1038,12 @@ def _formatear_hoja_excel(ws):
         for cell in row:
             cell.alignment = Alignment(vertical="top", wrap_text=True)
 
-def generar_tabla_estadistica(df_peso, df_inbody, df_eval, df_medicacion):
+def generar_tabla_estadistica(ficha, df_peso, df_inbody, df_eval, df_medicacion):
     from functools import reduce
 
+    # -----------------------------
+    # PESO
+    # -----------------------------
     if df_peso is not None and not df_peso.empty:
         peso = df_peso.copy()
         peso["fecha"] = pd.to_datetime(peso["fecha"], errors="coerce")
@@ -1048,6 +1051,9 @@ def generar_tabla_estadistica(df_peso, df_inbody, df_eval, df_medicacion):
     else:
         peso = pd.DataFrame(columns=["fecha", "peso_kg", "imc"])
 
+    # -----------------------------
+    # INBODY
+    # -----------------------------
     if df_inbody is not None and not df_inbody.empty:
         inbody = df_inbody.copy()
         inbody["fecha"] = pd.to_datetime(inbody["fecha"], errors="coerce")
@@ -1069,6 +1075,9 @@ def generar_tabla_estadistica(df_peso, df_inbody, df_eval, df_medicacion):
             "grasa_visceral"
         ])
 
+    # -----------------------------
+    # EVALUACIONES
+    # -----------------------------
     if df_eval is not None and not df_eval.empty:
         evals = df_eval.copy()
         evals["fecha"] = pd.to_datetime(evals["fecha"], errors="coerce")
@@ -1086,6 +1095,9 @@ def generar_tabla_estadistica(df_peso, df_inbody, df_eval, df_medicacion):
         silla = pd.DataFrame(columns=["fecha", "SitToStand_rep", "SitToStand_percentil"])
         caminata = pd.DataFrame(columns=["fecha", "Caminata6m_m", "Caminata6m_percentil"])
 
+    # -----------------------------
+    # MEDICACION
+    # -----------------------------
     if df_medicacion is not None and not df_medicacion.empty:
         med = df_medicacion.copy()
         med["fecha_cambio"] = pd.to_datetime(med["fecha_cambio"], errors="coerce")
@@ -1112,6 +1124,9 @@ def generar_tabla_estadistica(df_peso, df_inbody, df_eval, df_medicacion):
     else:
         med = pd.DataFrame(columns=["fecha", "Droga", "Dosis", "Unidad", "Frecuencia", "Via", "Estado"])
 
+    # -----------------------------
+    # MERGE GLOBAL
+    # -----------------------------
     dfs = [peso, inbody, prension, silla, caminata, med]
     dfs_validos = [df for df in dfs if df is not None]
 
@@ -1135,64 +1150,32 @@ def generar_tabla_estadistica(df_peso, df_inbody, df_eval, df_medicacion):
         inplace=True
     )
 
+    df_final.insert(0, "PacienteID_Ficha", ficha.get("id"))
+    df_final.insert(0, "Paciente", ficha.get("nombre"))
+
     return df_final
 
 
 def generar_excel_paciente(ficha, df_peso, df_inbody, df_eval, df_medicacion):
     output = BytesIO()
 
-    ficha_df = pd.DataFrame([{
-        "Paciente": ficha["nombre"],
-        "PacienteID_Ficha": ficha["id"],
-        "Sexo": ficha["sexo"],
-        "Talla_m": ficha["talla_m"],
-        "CantidadEvaluaciones": ficha["cantidad_evaluaciones"],
-        "UltimaFechaEvaluacion": ficha["ultima_fecha"],
-        "UltimaClasificacion": ficha["ultima_clasificacion"],
-        "UltimaPrueba": ficha["ultima_prueba"],
-        "FechaExportacion": datetime.now().strftime("%Y-%m-%d %H:%M")
-    }])
-
-    df_peso_export = agregar_identificacion_paciente(df_peso, ficha, "Peso_IMC")
-    df_inbody_enriquecido = enriquecer_historial_corporal(
-        df_inbody,
-        str(ficha["sexo"]).strip().lower(),
-        ficha["talla_m"]
-    )
-    df_inbody_export = agregar_identificacion_paciente(df_inbody_enriquecido, ficha, "Composicion_Corporal")
-    df_eval_export = agregar_identificacion_paciente(df_eval, ficha, "Evaluaciones")
-    df_medicacion_export = agregar_identificacion_paciente(df_medicacion, ficha, "Medicacion")
-
-    df_analisis = generar_df_analisis_cientifico(
-    ficha=ficha,
-    df_peso=df_peso,
-    df_inbody=df_inbody,
-    df_eval=df_eval,
-    df_medicacion=df_medicacion
-    )
-
     df_estadistico = generar_tabla_estadistica(
-    df_peso=df_peso,
-    df_inbody=df_inbody,
-    df_eval=df_eval,
-    df_medicacion=df_medicacion
-    )  
-    
-    if not df_analisis.empty:
-        df_analisis = df_analisis.rename(columns={"PacienteID": "PacienteID_Ficha"})
+        ficha=ficha,
+        df_peso=df_peso,
+        df_inbody=df_inbody,
+        df_eval=df_eval,
+        df_medicacion=df_medicacion
+    )
 
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
-        preparar_df_exportacion(ficha_df).to_excel(writer, sheet_name="00_Ficha", index=False)
-        preparar_df_exportacion(df_peso_export).to_excel(writer, sheet_name="01_Peso_IMC", index=False)
-        preparar_df_exportacion(df_inbody_export).to_excel(writer, sheet_name="02_Composicion", index=False)
-        preparar_df_exportacion(df_eval_export).to_excel(writer, sheet_name="03_Evaluaciones", index=False)
-        preparar_df_exportacion(df_analisis).to_excel(writer, sheet_name="04_Analisis", index=False)
-        preparar_df_exportacion(df_medicacion_export).to_excel(writer, sheet_name="05_Medicacion", index=False)
-        preparar_df_exportacion(df_estadistico).to_excel(writer, sheet_name="06_Datos_Estadisticos", index=False)
-        
+        preparar_df_exportacion(df_estadistico).to_excel(
+            writer,
+            sheet_name="Datos_Estadisticos",
+            index=False
+        )
+
         workbook = writer.book
-        for nombre_hoja in workbook.sheetnames:
-            _formatear_hoja_excel(workbook[nombre_hoja])
+        _formatear_hoja_excel(workbook["Datos_Estadisticos"])
 
     output.seek(0)
     return output
