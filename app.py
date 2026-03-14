@@ -2072,11 +2072,13 @@ with g1:
             df_peso = df_peso.dropna(subset=["fecha", "peso_kg", "imc"]).sort_values("fecha", ascending=True)
 
             if not df_peso.empty:
+                df_peso["fecha_str"] = df_peso["fecha"].dt.strftime("%Y-%m-%d")
+
                 valor_max = max(df_peso["peso_kg"].max(), df_peso["imc"].max())
                 valor_max = max(10, round(valor_max * 1.10, 1))
 
                 df_peso_long = df_peso.melt(
-                    id_vars=["fecha"],
+                    id_vars=["fecha_str"],
                     value_vars=["peso_kg", "imc"],
                     var_name="variable",
                     value_name="valor"
@@ -2086,7 +2088,7 @@ with g1:
                     alt.Chart(df_peso_long)
                     .mark_line(point=True)
                     .encode(
-                        x=alt.X("fecha:T", title="Fecha"),
+                        x=alt.X("fecha_str:O", title="Fecha"),
                         y=alt.Y(
                             "valor:Q",
                             title="Valor",
@@ -2094,7 +2096,7 @@ with g1:
                         ),
                         color=alt.Color("variable:N", title="Serie"),
                         tooltip=[
-                            alt.Tooltip("fecha:T", title="Fecha"),
+                            alt.Tooltip("fecha_str:O", title="Fecha"),
                             alt.Tooltip("variable:N", title="Serie"),
                             alt.Tooltip("valor:Q", title="Valor", format=".2f")
                         ]
@@ -2136,14 +2138,11 @@ with g2:
                     .sort_values("fecha")
                 )
 
+                df_prueba["fecha_str"] = df_prueba["fecha"].dt.strftime("%Y-%m-%d")
                 df_prueba["Etiqueta"] = df_prueba["percentil"].apply(lambda x: f"P{round(x, 1)}")
 
                 linea = alt.Chart(df_prueba).mark_line(point=False).encode(
-                    x=alt.X(
-                        "fecha:T",
-                        title="Fecha",
-                        axis=alt.Axis(format="%d-%m-%Y")
-                    ),
+                    x=alt.X("fecha_str:O", title="Fecha"),
                     y=alt.Y(
                         "percentil:Q",
                         title="Percentil",
@@ -2152,7 +2151,7 @@ with g2:
                 )
 
                 puntos = alt.Chart(df_prueba).mark_circle(size=90).encode(
-                    x=alt.X("fecha:T"),
+                    x=alt.X("fecha_str:O"),
                     y=alt.Y(
                         "percentil:Q",
                         scale=alt.Scale(domain=[0, 100], nice=False, zero=True)
@@ -2163,7 +2162,7 @@ with g2:
                     dy=-12,
                     fontSize=12
                 ).encode(
-                    x=alt.X("fecha:T"),
+                    x=alt.X("fecha_str:O"),
                     y=alt.Y(
                         "percentil:Q",
                         scale=alt.Scale(domain=[0, 100], nice=False, zero=True)
@@ -2188,4 +2187,4 @@ with g2:
             else:
                 st.info("Sin datos funcionales para esa prueba.")
         else:
-            st.info("Sin historial funcional para graficar.")
+            st.info("Sin historial funcional para graficar.")r.")
