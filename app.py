@@ -2187,4 +2187,4 @@ with g2:
             else:
                 st.info("Sin datos funcionales para esa prueba.")
         else:
-            st.info("Sin historial funcional para graficar.")r.")
+            st.info("Sin historial funcional para graficar.")
