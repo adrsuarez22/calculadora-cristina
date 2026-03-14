@@ -2123,11 +2123,12 @@ with g2:
     if paciente_nombre:
         df_historial = obtener_historial_paciente(paciente_nombre)
 
-        if not df_historial.empty and {"fecha", "percentil", "prueba"}.issubset(df_historial.columns):
+        if not df_historial.empty and {"fecha", "percentil", "prueba", "clasificacion"}.issubset(df_historial.columns):
             df_graf_base = df_historial.copy()
             df_graf_base["fecha"] = pd.to_datetime(df_graf_base["fecha"], errors="coerce")
             df_graf_base["percentil"] = pd.to_numeric(df_graf_base["percentil"], errors="coerce")
             df_graf_base["prueba"] = df_graf_base["prueba"].astype(str).str.strip()
+            df_graf_base["clasificacion"] = df_graf_base["clasificacion"].astype(str).str.strip()
             df_graf_base = df_graf_base.dropna(subset=["fecha", "percentil", "prueba"])
 
             filtro_historial = st.session_state.get("filtro_historial_prueba", "Todas")
@@ -2147,36 +2148,74 @@ with g2:
 
             if not df_prueba.empty:
                 df_prueba = (
-                    df_prueba.groupby("fecha", as_index=False)["percentil"]
-                    .mean()
-                    .sort_values("fecha")
+                    df_prueba.sort_values("fecha")
+                    .groupby("fecha", as_index=False)
+                    .agg({
+                        "percentil": "mean",
+                        "clasificacion": "last"
+                    })
                 )
 
                 df_prueba["fecha_str"] = df_prueba["fecha"].dt.strftime("%Y-%m-%d")
                 df_prueba["Etiqueta"] = df_prueba["percentil"].apply(lambda x: f"P{round(x, 1)}")
 
-                linea = alt.Chart(df_prueba).mark_line(point=False).encode(
-                    x=alt.X("fecha_str:O", title="Fecha"),
+                dominio_x = df_prueba["fecha_str"].tolist()
+
+                linea_p50_df = pd.DataFrame({
+                    "fecha_str": dominio_x,
+                    "p50": [50] * len(dominio_x)
+                })
+
+                linea_p50 = alt.Chart(linea_p50_df).mark_line(strokeDash=[6, 4]).encode(
+                    x=alt.X("fecha_str:O", title="Fecha", sort=dominio_x),
+                    y=alt.Y(
+                        "p50:Q",
+                        title="Percentil",
+                        scale=alt.Scale(domain=[0, 100], nice=False, zero=True)
+                    ),
+                    tooltip=[alt.Tooltip("p50:Q", title="Referencia", format=".0f")]
+                )
+
+                linea = alt.Chart(df_prueba).mark_line().encode(
+                    x=alt.X("fecha_str:O", title="Fecha", sort=dominio_x),
                     y=alt.Y(
                         "percentil:Q",
                         title="Percentil",
                         scale=alt.Scale(domain=[0, 100], nice=False, zero=True)
-                    )
+                    ),
+                    tooltip=[
+                        alt.Tooltip("fecha_str:O", title="Fecha"),
+                        alt.Tooltip("percentil:Q", title="Percentil", format=".1f"),
+                        alt.Tooltip("clasificacion:N", title="Clasificación")
+                    ]
                 )
 
-                puntos = alt.Chart(df_prueba).mark_circle(size=90).encode(
-                    x=alt.X("fecha_str:O"),
+                puntos = alt.Chart(df_prueba).mark_circle(size=110).encode(
+                    x=alt.X("fecha_str:O", sort=dominio_x),
                     y=alt.Y(
                         "percentil:Q",
                         scale=alt.Scale(domain=[0, 100], nice=False, zero=True)
-                    )
+                    ),
+                    color=alt.Color(
+                        "clasificacion:N",
+                        title="Clasificación",
+                        scale=alt.Scale(
+                            domain=["Muy bajo", "Bajo", "Ligeramente bajo", "Normal", "Bueno", "Muy bueno"],
+                            range=["#d32f2f", "#f57c00", "#fbc02d", "#388e3c", "#1976d2", "#00796b"]
+                        )
+                    ),
+                    tooltip=[
+                        alt.Tooltip("fecha_str:O", title="Fecha"),
+                        alt.Tooltip("percentil:Q", title="Percentil", format=".1f"),
+                        alt.Tooltip("clasificacion:N", title="Clasificación")
+                    ]
                 )
 
                 etiquetas = alt.Chart(df_prueba).mark_text(
                     dy=-12,
                     fontSize=12
                 ).encode(
-                    x=alt.X("fecha_str:O"),
+                    x=alt.X("fecha_str:O", sort=dominio_x),
                     y=alt.Y(
                         "percentil:Q",
                         scale=alt.Scale(domain=[0, 100], nice=False, zero=True)
@@ -2184,20 +2223,35 @@ with g2:
                     text="Etiqueta:N"
                 )
 
-                grafico = (linea + puntos + etiquetas).properties(height=320)
+                grafico = (linea_p50 + linea + puntos + etiquetas).properties(height=320)
                 st.altair_chart(grafico, use_container_width=True)
 
                 ultimo = df_prueba["percentil"].iloc[-1]
+
                 if len(df_prueba) >= 2:
                     anterior = df_prueba["percentil"].iloc[-2]
                     diferencia = round(ultimo - anterior, 1)
 
+                    fecha_ult = df_prueba["fecha"].iloc[-1]
+                    fecha_ant = df_prueba["fecha"].iloc[-2]
+                    dias = (fecha_ult - fecha_ant).days if pd.notna(fecha_ult) and pd.notna(fecha_ant) else None
+
                     if diferencia > 0:
-                        st.success(f"↑ Mejora de {diferencia} percentiles desde la evaluación anterior")
+                        if dias is not None:
+                            st.success(f"Tendencia funcional favorable: +{diferencia} percentiles en {dias} días.")
+                        else:
+                            st.success(f"Tendencia funcional favorable: +{diferencia} percentiles.")
                     elif diferencia < 0:
-                        st.warning(f"↓ Disminución de {abs(diferencia)} percentiles desde la evaluación anterior")
+                        if dias is not None:
+                            st.warning(f"Tendencia funcional desfavorable: -{abs(diferencia)} percentiles en {dias} días.")
+                        else:
+                            st.warning(f"Tendencia funcional desfavorable: -{abs(diferencia)} percentiles.")
                     else:
-                        st.info("Sin cambios respecto a la evaluación anterior")
+                        st.info("Tendencia funcional estable respecto de la evaluación anterior.")
+
+                elif len(df_prueba) == 1:
+                    clasif_actual = df_prueba["clasificacion"].iloc[-1]
+                    st.info(f"Una sola evaluación disponible. Clasificación actual: {clasif_actual}.")
             else:
                 st.info("Sin datos funcionales para esa prueba.")
         else:
