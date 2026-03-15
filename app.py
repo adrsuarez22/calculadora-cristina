@@ -463,10 +463,6 @@ def guardar_paciente(nombre, sexo, fecha_nacimiento, talla_m):
 
 
 def eliminar_paciente(paciente_id):
-    resp = supabase.table("evaluaciones").select("id").eq("paciente_id", paciente_id).execute()
-
-    if len(resp.data) > 0:
-        raise Exception("El paciente tiene evaluaciones registradas")
 
     resp_del = supabase.table("pacientes").delete().eq("id", paciente_id).execute()
     limpiar_cache()
