@@ -21,6 +21,101 @@ from openpyxl.styles import Font, PatternFill, Alignment
 from openpyxl.utils import get_column_letter
 
 # =========================================================
+# PREPARACION DATASET ESTADISTICO
+# =========================================================
+
+def normalizar_sexo(valor):
+    if pd.isna(valor):
+        return None
+    v = str(valor).strip().lower()
+    if v in ["hombre", "masculino", "m", "male"]:
+        return "hombre"
+    if v in ["mujer", "femenino", "f", "female"]:
+        return "mujer"
+    return str(valor).strip()
+
+
+def preparar_df_estadistico(df):
+    df = df.copy()
+
+    columnas_fecha = ["FechaNacimiento", "Fecha"]
+    for col in columnas_fecha:
+        if col in df.columns:
+            df[col] = pd.to_datetime(df[col], errors="coerce").dt.date
+
+    if "Sexo" in df.columns:
+        df["Sexo"] = df["Sexo"].apply(normalizar_sexo)
+
+    if "FechaNacimiento" in df.columns and "Fecha" in df.columns:
+        fecha_nac = pd.to_datetime(df["FechaNacimiento"], errors="coerce")
+        fecha_med = pd.to_datetime(df["Fecha"], errors="coerce")
+        df["Edad"] = ((fecha_med - fecha_nac).dt.days / 365.25).round(1)
+
+    columnas_numericas = [
+        "Peso_kg",
+        "IMC",
+        "Grasa_pct",
+        "Musculo_kg",
+        "Agua_pct",
+        "Grasa_Visceral",
+        "Prension",
+        "Sit_to_Stand",
+        "Marcha_4m",
+        "SPPB",
+        "TUG",
+        "VO2max"
+    ]
+
+    for col in columnas_numericas:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+
+    return df
+
+
+def preparar_dataset_longitudinal(df_estadistico):
+
+    columnas_base = [
+        "Paciente",
+        "PacienteID_Ficha",
+        "Sexo",
+        "FechaNacimiento",
+        "Edad",
+        "Fecha"
+    ]
+
+    columnas_base = [c for c in columnas_base if c in df_estadistico.columns]
+
+    value_vars = [c for c in df_estadistico.columns if c not in columnas_base]
+
+    df_long = df_estadistico.melt(
+        id_vars=columnas_base,
+        value_vars=value_vars,
+        var_name="Variable",
+        value_name="Valor"
+    )
+
+    df_long["Valor"] = pd.to_numeric(df_long["Valor"], errors="coerce")
+
+    df_long = df_long.dropna(subset=["Valor"])
+
+    mapa_unidades = {
+        "Peso_kg": "kg",
+        "IMC": "kg/m2",
+        "Grasa_pct": "%",
+        "Musculo_kg": "kg",
+        "Agua_pct": "%",
+        "Grasa_Visceral": "nivel",
+        "Prension": "kg"
+    }
+
+    df_long["Unidad"] = df_long["Variable"].map(mapa_unidades).fillna("")
+
+    df_long = df_long.sort_values(["Paciente", "Fecha", "Variable"])
+
+    return df_long
+    
+# =========================================================
 # CONFIG
 # =========================================================
 st.set_page_config(
