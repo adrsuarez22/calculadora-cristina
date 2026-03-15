@@ -2399,6 +2399,38 @@ filtro_historial_global = "Todas"
 h1, h2 = st.columns([1, 1])
 
 with h1:
+    st.markdown("## Historial de peso / IMC")
+
+    df_peso_hist = df_peso_export.copy()
+
+    if not df_peso_hist.empty:
+        df_peso_hist["fecha"] = pd.to_datetime(df_peso_hist["fecha"], errors="coerce")
+        df_peso_hist = df_peso_hist.dropna(subset=["fecha"]).sort_values("fecha", ascending=False)
+
+        st.markdown("**Fecha | Peso | IMC | Eliminar**")
+
+        for _, row in df_peso_hist.iterrows():
+            c1, c2, c3, c4 = st.columns([1.2, 1, 1, 0.5])
+
+            fecha_txt = row["fecha"].strftime("%Y-%m-%d") if pd.notna(row.get("fecha")) else ""
+            peso_txt = f"{float(row['peso_kg']):.1f}" if pd.notna(row.get("peso_kg")) else ""
+            imc_txt = f"{float(row['imc']):.2f}" if pd.notna(row.get("imc")) else ""
+
+            c1.write(fecha_txt)
+            c2.write(peso_txt)
+            c3.write(imc_txt)
+
+            if c4.button("🗑", key=f"del_peso_{row['id']}"):
+                try:
+                    eliminar_registro_peso(row["id"])
+                    st.success("Registro de peso eliminado.")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error al eliminar registro de peso: {e}")
+    else:
+        st.info("Sin historial de peso / IMC.")
+
+with h2:
     st.markdown("## Historial corporal")
 
     df_inbody = df_inbody_export.copy()
@@ -2440,65 +2472,68 @@ with h1:
     else:
         st.info("Sin historial corporal.")
 
-with h2:
-    st.markdown("## Historial funcional")
-
-    df_historial = df_eval_export.copy()
-
-    if not df_historial.empty:
-        filtro_historial_global = st.selectbox(
-            "Filtrar historial por prueba",
-            options=["Todas", "Caminata 6 minutos", "Prensión manual", "Levantarse de la silla"],
-            index=0,
-            key="filtro_historial_prueba"
-        )
-
-        prueba_filtro = filtro_historial_global
-
-        if prueba_filtro == "Todas":
-            df_historial_filtrado = df_historial.copy()
-        else:
-            df_historial_filtrado = df_historial[
-                df_historial["prueba"].astype(str).str.strip() == prueba_filtro
-            ].copy()
-
-        columnas_mostrar = ["id", "fecha", "prueba", "valor_medido", "percentil", "clasificacion"]
-        columnas_existentes = [c for c in columnas_mostrar if c in df_historial_filtrado.columns]
-
-        df_historial_mostrar = df_historial_filtrado[columnas_existentes].copy()
-
-        if "fecha" in df_historial_mostrar.columns:
-            df_historial_mostrar["fecha"] = pd.to_datetime(
-                df_historial_mostrar["fecha"],
-                errors="coerce"
-            ).dt.strftime("%Y-%m-%d")
-
-        df_historial_mostrar = df_historial_mostrar.sort_values(by="fecha", ascending=False)
-
-        st.markdown("**Fecha | Prueba | Valor | Percentil | Clasificación | Eliminar**")
-
-        for _, row in df_historial_mostrar.iterrows():
-            c1, c2, c3, c4, c5, c6 = st.columns([1, 2, 1, 1, 1, 0.5])
-
-            c1.write(row.get("fecha", ""))
-            c2.write(row.get("prueba", ""))
-            c3.write(row.get("valor_medido", ""))
-            c4.write(row.get("percentil", ""))
-            c5.write(row.get("clasificacion", ""))
-
-            if c6.button("🗑", key=f"del_{row['id']}"):
-                try:
-                    eliminar_evaluacion(row["id"])
-                    st.success("Evaluación eliminada.")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Error al eliminar: {e}")
-
-    else:
-        st.info("Sin historial funcional.")
-
 st.divider()
 
+# =========================================================
+# HISTORIAL FUNCIONAL
+# =========================================================
+st.markdown("## Historial funcional")
+
+df_historial = df_eval_export.copy()
+
+if not df_historial.empty:
+    filtro_historial_global = st.selectbox(
+        "Filtrar historial por prueba",
+        options=["Todas", "Caminata 6 minutos", "Prensión manual", "Levantarse de la silla"],
+        index=0,
+        key="filtro_historial_prueba"
+    )
+
+    prueba_filtro = filtro_historial_global
+
+    if prueba_filtro == "Todas":
+        df_historial_filtrado = df_historial.copy()
+    else:
+        df_historial_filtrado = df_historial[
+            df_historial["prueba"].astype(str).str.strip() == prueba_filtro
+        ].copy()
+
+    columnas_mostrar = ["id", "fecha", "prueba", "valor_medido", "percentil", "clasificacion"]
+    columnas_existentes = [c for c in columnas_mostrar if c in df_historial_filtrado.columns]
+
+    df_historial_mostrar = df_historial_filtrado[columnas_existentes].copy()
+
+    if "fecha" in df_historial_mostrar.columns:
+        df_historial_mostrar["fecha"] = pd.to_datetime(
+            df_historial_mostrar["fecha"],
+            errors="coerce"
+        ).dt.strftime("%Y-%m-%d")
+
+    df_historial_mostrar = df_historial_mostrar.sort_values(by="fecha", ascending=False)
+
+    st.markdown("**Fecha | Prueba | Valor | Percentil | Clasificación | Eliminar**")
+
+    for _, row in df_historial_mostrar.iterrows():
+        c1, c2, c3, c4, c5, c6 = st.columns([1, 2, 1, 1, 1, 0.5])
+
+        c1.write(row.get("fecha", ""))
+        c2.write(row.get("prueba", ""))
+        c3.write(row.get("valor_medido", ""))
+        c4.write(row.get("percentil", ""))
+        c5.write(row.get("clasificacion", ""))
+
+        if c6.button("🗑", key=f"del_{row['id']}"):
+            try:
+                eliminar_evaluacion(row["id"])
+                st.success("Evaluación eliminada.")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Error al eliminar: {e}")
+
+else:
+    st.info("Sin historial funcional.")
+
+st.divider()
 # =========================================================
 # GRÁFICOS
 # =========================================================
