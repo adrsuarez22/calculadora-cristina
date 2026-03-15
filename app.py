@@ -100,6 +100,7 @@ def obtener_evaluaciones(paciente_id):
     resp = (
         supabase
         .table("evaluaciones")
+        -
         .select("*")
         .eq("paciente_id", paciente_id)
         .order("fecha")
@@ -325,7 +326,7 @@ def clasificar_imc(imc_calculado):
 def eliminar_evaluacion(id_registro):
     return supabase.table("evaluaciones").delete().eq("id", id_registro).execute()
 
-
+@st.cache_data(ttl=300)
 def obtener_historial_paciente(paciente):
     try:
         respuesta = (
