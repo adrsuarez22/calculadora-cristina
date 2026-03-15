@@ -571,6 +571,10 @@ def eliminar_evaluacion(id_registro):
     limpiar_cache()
     return resp
 
+def eliminar_registro_peso(id_registro):
+    resp = supabase.table("seguimiento_peso").delete().eq("id", id_registro).execute()
+    limpiar_cache()
+    return resp
 
 def eliminar_registro_corporal(id_registro):
     resp = supabase.table("inbody_registros").delete().eq("id", id_registro).execute()
