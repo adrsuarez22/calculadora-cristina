@@ -427,6 +427,7 @@ def guardar_evaluacion(paciente_nombre, sexo, edad, prueba, valor_medido, percen
         "valor_medido": float(valor_medido),
         "percentil": round(float(percentil), 1) if percentil is not None else None,
         "clasificacion": str(clasificacion).strip()
+        "paciente_id": paciente_id
     }
     resp = supabase.table("evaluaciones").insert(payload).execute()
     limpiar_cache()
