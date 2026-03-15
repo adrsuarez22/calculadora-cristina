@@ -1389,21 +1389,21 @@ def generar_excel_general(pacientes):
 
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
 
-    df_estadistico_limpio.to_excel(
+        df_estadistico_limpio.to_excel(
         writer,
         sheet_name="Datos_Estadisticos",
         index=False
-    )
+        )
 
-    df_longitudinal.to_excel(
+        df_longitudinal.to_excel(
         writer,
         sheet_name="Dataset_Longitudinal",
         index=False
-    )
+        )
 
-    workbook = writer.book
-    _formatear_hoja_excel(workbook["Datos_Estadisticos"])
-    _formatear_hoja_excel(workbook["Dataset_Longitudinal"])
+        workbook = writer.book
+        _formatear_hoja_excel(workbook["Datos_Estadisticos"])
+        _formatear_hoja_excel(workbook["Dataset_Longitudinal"])
 
 output.seek(0)
 return output
