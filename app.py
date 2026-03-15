@@ -100,7 +100,6 @@ def obtener_evaluaciones(paciente_id):
     resp = (
         supabase
         .table("evaluaciones")
-        -
         .select("*")
         .eq("paciente_id", paciente_id)
         .order("fecha")
