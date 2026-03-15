@@ -1803,7 +1803,9 @@ with st.expander("➕ Nuevo paciente"):
     nuevo_sexo = st.selectbox("Sexo del nuevo paciente", ["hombre", "mujer"], key="nuevo_sexo_alta")
     nueva_fecha_nacimiento = st.date_input(
         "Fecha de nacimiento",
-        value=date(1980, 1, 1),
+        value=date(1970, 1, 1),
+        min_value=date(1920, 1, 1),
+        max_value=date.today(),
         key="nueva_fecha_nacimiento_alta"
     )
     nueva_talla = st.number_input(
