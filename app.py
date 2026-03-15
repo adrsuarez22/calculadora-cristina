@@ -1930,22 +1930,31 @@ with top1:
         if busqueda_paciente.strip().lower() in str(p["nombre"]).strip().lower()
     ]
 
-    opciones_filtradas = [p["nombre"] for p in pacientes_filtrados]
+    etiquetas = []
 
-    if not opciones_filtradas:
+    for p in pacientes_filtrados:
+        etiqueta = f"{p['nombre']} | ID {p['id']}"
+
+        if "fecha_nacimiento" in p and p["fecha_nacimiento"]:
+            etiqueta += f" | Nac: {p['fecha_nacimiento']}"
+
+        etiquetas.append(etiqueta)
+
+    if not etiquetas:
         st.warning("No se encontraron pacientes con esa búsqueda.")
         st.stop()
 
-    paciente_nombre = st.selectbox(
+    seleccion = st.selectbox(
         "Seleccionar paciente",
-        opciones_filtradas
+        etiquetas
     )
 
-    paciente_id = next(
-        p["id"] for p in pacientes_filtrados if p["nombre"] == paciente_nombre
-    )
-paciente_actual = next((p for p in pacientes_filtrados if p["nombre"] == paciente_nombre), None)
-paciente_id = paciente_actual["id"] if paciente_actual else None
+    indice = etiquetas.index(seleccion)
+
+    paciente_actual = pacientes_filtrados[indice]
+    paciente_id = paciente_actual["id"]
+    paciente_nombre = paciente_actual["nombre"]
+    
 with top4:
     st.markdown("###")
     confirmar_eliminar = st.checkbox(
