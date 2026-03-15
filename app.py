@@ -1383,20 +1383,30 @@ def generar_excel_general(pacientes):
             "Via",
             "Estado"
         ])
+        
+    df_estadistico_limpio = preparar_df_estadistico(preparar_df_exportacion(df_estadistico))
+    df_longitudinal = preparar_dataset_longitudinal(df_estadistico_limpio)
 
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
-        preparar_df_exportacion(df_estadistico).to_excel(
-            writer,
-            sheet_name="Datos_Estadisticos",
-            index=False
-        )
 
-        workbook = writer.book
-        _formatear_hoja_excel(workbook["Datos_Estadisticos"])
+    df_estadistico_limpio.to_excel(
+        writer,
+        sheet_name="Datos_Estadisticos",
+        index=False
+    )
 
-    output.seek(0)
-    return output
+    df_longitudinal.to_excel(
+        writer,
+        sheet_name="Dataset_Longitudinal",
+        index=False
+    )
 
+    workbook = writer.book
+    _formatear_hoja_excel(workbook["Datos_Estadisticos"])
+    _formatear_hoja_excel(workbook["Dataset_Longitudinal"])
+
+output.seek(0)
+return output
 
 # =========================================================
 # EXPORTACIÓN PDF
