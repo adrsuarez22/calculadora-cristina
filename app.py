@@ -1917,15 +1917,32 @@ if not opciones_pacientes:
 top1, top2, top3, top4 = st.columns([2, 1, 1, 1])
 
 with top1:
+    busqueda_paciente = st.text_input(
+        "Buscar paciente",
+        value="",
+        placeholder="Escribí nombre o parte del nombre...",
+        key="busqueda_paciente"
+    )
+
+    pacientes_filtrados = [
+        p for p in pacientes
+        if busqueda_paciente.strip().lower() in str(p["nombre"]).strip().lower()
+    ]
+
+    opciones_filtradas = [p["nombre"] for p in pacientes_filtrados]
+
+    if not opciones_filtradas:
+        st.warning("No se encontraron pacientes con esa búsqueda.")
+        st.stop()
+
     paciente_nombre = st.selectbox(
         "Seleccionar paciente",
-        opciones_pacientes,
+        opciones_filtradas,
         key="selector_paciente"
     )
 
-paciente_actual = next((p for p in pacientes if p["nombre"] == paciente_nombre), None)
+paciente_actual = next((p for p in pacientes_filtrados if p["nombre"] == paciente_nombre), None)
 paciente_id = paciente_actual["id"] if paciente_actual else None
-
 with top4:
     st.markdown("###")
     confirmar_eliminar = st.checkbox(
