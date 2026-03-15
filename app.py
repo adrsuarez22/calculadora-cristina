@@ -1262,16 +1262,24 @@ def _formatear_hoja_excel(ws):
 def generar_tabla_estadistica(ficha, df_peso, df_inbody, df_eval, df_medicacion):
     from functools import reduce
 
+    def normalizar_fecha_df(df, col_fecha):
+        if df is None or df.empty:
+            return df
+        df = df.copy()
+        df[col_fecha] = pd.to_datetime(df[col_fecha], errors="coerce").dt.normalize()
+        df = df.dropna(subset=[col_fecha])
+        return df
+
     if df_peso is not None and not df_peso.empty:
         peso = df_peso.copy()
-        peso["fecha"] = pd.to_datetime(peso["fecha"], errors="coerce")
+        peso = normalizar_fecha_df(peso, "fecha")
         peso = peso[["fecha", "peso_kg", "imc"]]
     else:
         peso = pd.DataFrame(columns=["fecha", "peso_kg", "imc"])
 
     if df_inbody is not None and not df_inbody.empty:
         inbody = df_inbody.copy()
-        inbody["fecha"] = pd.to_datetime(inbody["fecha"], errors="coerce")
+        inbody = normalizar_fecha_df(inbody, "fecha")
         inbody = inbody[
             [
                 "fecha",
@@ -1292,7 +1300,7 @@ def generar_tabla_estadistica(ficha, df_peso, df_inbody, df_eval, df_medicacion)
 
     if df_eval is not None and not df_eval.empty:
         evals = df_eval.copy()
-        evals["fecha"] = pd.to_datetime(evals["fecha"], errors="coerce")
+        evals = normalizar_fecha_df(evals, "fecha")
 
         prension = evals[evals["prueba"] == "Prensión manual"][["fecha", "valor_medido", "percentil"]].copy()
         prension.columns = ["fecha", "Prension_kg", "Prension_percentil"]
@@ -1309,7 +1317,7 @@ def generar_tabla_estadistica(ficha, df_peso, df_inbody, df_eval, df_medicacion)
 
     if df_medicacion is not None and not df_medicacion.empty:
         med = df_medicacion.copy()
-        med["fecha_cambio"] = pd.to_datetime(med["fecha_cambio"], errors="coerce")
+        med = normalizar_fecha_df(med, "fecha_cambio")
         med = med[
             [
                 "fecha_cambio",
@@ -1330,14 +1338,20 @@ def generar_tabla_estadistica(ficha, df_peso, df_inbody, df_eval, df_medicacion)
             "Via",
             "Estado"
         ]
+        med["fecha"] = pd.to_datetime(med["fecha"], errors="coerce").dt.normalize()
+        med = med.dropna(subset=["fecha"])
     else:
         med = pd.DataFrame(columns=["fecha", "Droga", "Dosis", "Unidad", "Frecuencia", "Via", "Estado"])
 
     dfs = [peso, inbody, prension, silla, caminata, med]
-    dfs_validos = [df for df in dfs if df is not None]
+    dfs_validos = [df for df in dfs if df is not None and not df.empty]
 
     if not dfs_validos:
         return pd.DataFrame()
+
+    for i in range(len(dfs_validos)):
+        dfs_validos[i] = dfs_validos[i].copy()
+        dfs_validos[i]["fecha"] = pd.to_datetime(dfs_validos[i]["fecha"], errors="coerce").dt.normalize()
 
     df_final = reduce(lambda left, right: pd.merge(left, right, on="fecha", how="outer"), dfs_validos)
 
