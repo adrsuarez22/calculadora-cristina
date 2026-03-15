@@ -484,20 +484,33 @@ def guardar_peso(paciente_id, fecha_medicion, peso_kg, talla_m):
         raise ValueError("El peso debe ser mayor a 0.")
 
     imc = round(float(peso_kg) / (float(talla_m) ** 2), 2)
-    fecha_txt = pd.to_datetime(fecha_medicion).strftime("%Y-%m-%d")
+    fecha_txt = str(fecha_medicion)
+
+    existente = (
+        supabase.table("seguimiento_peso")
+        .select("id")
+        .eq("paciente_id", int(paciente_id))
+        .eq("fecha", fecha_txt)
+        .execute()
+    )
 
     payload = {
         "paciente_id": int(paciente_id),
         "fecha": fecha_txt,
         "peso_kg": float(peso_kg),
-        "imc": float(imc)
+        "imc": imc
     }
 
-    resp = (
-        supabase.table("seguimiento_peso")
-        .upsert(payload, on_conflict="paciente_id,fecha")
-        .execute()
-    )
+    if existente.data:
+        id_existente = existente.data[0]["id"]
+        resp = (
+            supabase.table("seguimiento_peso")
+            .update(payload)
+            .eq("id", id_existente)
+            .execute()
+        )
+    else:
+        resp = supabase.table("seguimiento_peso").insert(payload).execute()
 
     limpiar_cache()
     return resp
@@ -577,15 +590,61 @@ def eliminar_evaluacion(id_registro):
     limpiar_cache()
     return resp
 
+
 def eliminar_registro_peso(id_registro):
     resp = supabase.table("seguimiento_peso").delete().eq("id", id_registro).execute()
     limpiar_cache()
     return resp
 
+
 def eliminar_registro_corporal(id_registro):
     resp = supabase.table("inbody_registros").delete().eq("id", id_registro).execute()
     limpiar_cache()
     return resp
+
+
+def obtener_ultimo_id_peso(df_peso):
+    if df_peso is None or df_peso.empty or "id" not in df_peso.columns:
+        return None
+
+    df_tmp = df_peso.copy()
+
+    if "fecha" in df_tmp.columns:
+        df_tmp["fecha"] = pd.to_datetime(df_tmp["fecha"], errors="coerce")
+    if "created_at" in df_tmp.columns:
+        df_tmp["created_at"] = pd.to_datetime(df_tmp["created_at"], errors="coerce")
+
+    columnas_sort = []
+    ascending_sort = []
+
+    if "fecha" in df_tmp.columns:
+        columnas_sort.append("fecha")
+        ascending_sort.append(False)
+
+    if "created_at" in df_tmp.columns:
+        columnas_sort.append("created_at")
+        ascending_sort.append(False)
+
+    columnas_sort.append("id")
+    ascending_sort.append(False)
+
+    df_tmp = df_tmp.sort_values(columnas_sort, ascending=ascending_sort)
+    return int(df_tmp.iloc[0]["id"])
+
+
+def obtener_ultimo_id_inbody(df_inbody):
+    if df_inbody is None or df_inbody.empty or "id" not in df_inbody.columns:
+        return None
+
+    df_tmp = df_inbody.copy()
+
+    if "fecha" in df_tmp.columns:
+        df_tmp["fecha"] = pd.to_datetime(df_tmp["fecha"], errors="coerce")
+        df_tmp = df_tmp.sort_values(["fecha", "id"], ascending=[False, False])
+    else:
+        df_tmp = df_tmp.sort_values("id", ascending=False)
+
+    return int(df_tmp.iloc[0]["id"])
 
 
 # =========================================================
@@ -1142,7 +1201,7 @@ def generar_df_analisis_cientifico(ficha, df_peso, df_inbody, df_eval, df_medica
             elif dosis_txt:
                 resultado_partes.append(dosis_txt)
             if frecuencia:
-                resultado_partes.append(frecuencia)
+                resultado_partes.append(f"{frecuencia}")
             if via:
                 resultado_partes.append(via)
 
@@ -1895,6 +1954,9 @@ df_medicacion_export = obtener_historial_medicacion(paciente_id) if paciente_id 
 
 ficha = construir_ficha_paciente(paciente_actual, df_eval_export)
 
+ultimo_id_peso = obtener_ultimo_id_peso(df_peso_export)
+ultimo_id_inbody = obtener_ultimo_id_inbody(df_inbody_export)
+
 # =========================================================
 # EXPORTACIONES ON DEMAND
 # =========================================================
@@ -2032,18 +2094,34 @@ with left:
                 st.markdown(f"**IMC:** {imc_calculado:.2f}")
                 st.markdown(f"**Clasificación:** {color_imc} {clasificacion_imc}")
 
-            if st.button("Guardar peso", key=f"btn_guardar_peso_{paciente_id}"):
-                try:
-                    guardar_peso(
-                        paciente_id=paciente_id,
-                        fecha_medicion=fecha_peso,
-                        peso_kg=peso_kg,
-                        talla_m=ficha["talla_m"]
-                    )
-                    st.success("Peso guardado correctamente.")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Error al guardar peso: {e}")
+            bp1, bp2 = st.columns(2)
+
+            with bp1:
+                if st.button("Guardar peso", key=f"btn_guardar_peso_{paciente_id}"):
+                    try:
+                        guardar_peso(
+                            paciente_id=paciente_id,
+                            fecha_medicion=fecha_peso,
+                            peso_kg=peso_kg,
+                            talla_m=ficha["talla_m"]
+                        )
+                        st.success("Peso guardado correctamente.")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Error al guardar peso: {e}")
+
+            with bp2:
+                if st.button(
+                    "Borrar último peso",
+                    key=f"btn_borrar_ultimo_peso_{paciente_id}",
+                    disabled=ultimo_id_peso is None
+                ):
+                    try:
+                        eliminar_registro_peso(ultimo_id_peso)
+                        st.success("Último registro de peso eliminado.")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Error al borrar último peso: {e}")
 
     st.markdown("## Composición corporal")
 
@@ -2132,24 +2210,40 @@ with left:
                 unsafe_allow_html=True
             )
 
-            if st.button("Guardar composición corporal", key=f"guardar_inbody_{paciente_id}"):
-                try:
-                    guardar_inbody(
-                        paciente_id=paciente_id,
-                        fecha_estudio=fecha_inbody,
-                        peso_kg=peso_inbody,
-                        talla_m=ficha["talla_m"],
-                        grasa_corporal_pct=grasa_pct,
-                        masa_muscular_kg=masa_muscular,
-                        agua_corporal_pct=agua_pct,
-                        grasa_visceral=grasa_visceral,
-                        metabolismo_basal=metabolismo,
-                        observaciones=observaciones_inbody
-                    )
-                    st.success("Composición corporal guardada correctamente")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Error al guardar composición corporal: {e}")
+            bc1, bc2 = st.columns(2)
+
+            with bc1:
+                if st.button("Guardar composición corporal", key=f"guardar_inbody_{paciente_id}"):
+                    try:
+                        guardar_inbody(
+                            paciente_id=paciente_id,
+                            fecha_estudio=fecha_inbody,
+                            peso_kg=peso_inbody,
+                            talla_m=ficha["talla_m"],
+                            grasa_corporal_pct=grasa_pct,
+                            masa_muscular_kg=masa_muscular,
+                            agua_corporal_pct=agua_pct,
+                            grasa_visceral=grasa_visceral,
+                            metabolismo_basal=metabolismo,
+                            observaciones=observaciones_inbody
+                        )
+                        st.success("Composición corporal guardada correctamente")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Error al guardar composición corporal: {e}")
+
+            with bc2:
+                if st.button(
+                    "Borrar última composición",
+                    key=f"btn_borrar_ultimo_inbody_{paciente_id}",
+                    disabled=ultimo_id_inbody is None
+                ):
+                    try:
+                        eliminar_registro_corporal(ultimo_id_inbody)
+                        st.success("Último registro corporal eliminado.")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Error al borrar última composición: {e}")
 
 with right:
     st.markdown("## Evaluación funcional")
@@ -2547,6 +2641,7 @@ else:
     st.info("Sin historial funcional.")
 
 st.divider()
+
 # =========================================================
 # GRÁFICOS
 # =========================================================
