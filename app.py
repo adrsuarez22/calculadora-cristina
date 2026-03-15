@@ -484,15 +484,34 @@ def guardar_peso(paciente_id, fecha_medicion, peso_kg, talla_m):
         raise ValueError("El peso debe ser mayor a 0.")
 
     imc = round(float(peso_kg) / (float(talla_m) ** 2), 2)
+    fecha_txt = str(fecha_medicion)
+
+    existente = (
+        supabase.table("seguimiento_peso")
+        .select("id")
+        .eq("paciente_id", int(paciente_id))
+        .eq("fecha", fecha_txt)
+        .execute()
+    )
 
     payload = {
         "paciente_id": int(paciente_id),
-        "fecha": str(fecha_medicion),
+        "fecha": fecha_txt,
         "peso_kg": float(peso_kg),
         "imc": imc
     }
 
-    resp = supabase.table("seguimiento_peso").insert(payload).execute()
+    if existente.data:
+        id_existente = existente.data[0]["id"]
+        resp = (
+            supabase.table("seguimiento_peso")
+            .update(payload)
+            .eq("id", id_existente)
+            .execute()
+        )
+    else:
+        resp = supabase.table("seguimiento_peso").insert(payload).execute()
+
     limpiar_cache()
     return resp
 
