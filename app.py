@@ -83,37 +83,139 @@ SUPABASE_URL = st.secrets["SUPABASE_URL"]
 SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+# =========================================================
+# LECTURAS CACHEADAS
+# =========================================================
 @st.cache_data(ttl=300)
 def obtener_pacientes():
-    resp = (
-        supabase
-        .table("pacientes")
-        .select("id,nombre")
-        .order("nombre")
-        .execute()
-    )
-    return resp.data
+    try:
+        resp = (
+            supabase
+            .table("pacientes")
+            .select("id,nombre,sexo,fecha_nacimiento,talla_m")
+            .order("nombre")
+            .execute()
+        )
+        return resp.data if resp.data else []
+    except Exception as e:
+        st.error(f"Error al leer pacientes: {e}")
+        return []
 
 
 @st.cache_data(ttl=300)
 def obtener_evaluaciones(paciente_id):
-    resp = (
-        supabase
-        .table("evaluaciones")
-        .select("*")
-        .eq("paciente_id", paciente_id)
-        .order("fecha")
-        .execute()
-    )
-    return resp.data
-def eliminar_paciente(paciente_id):
+    try:
+        resp = (
+            supabase
+            .table("evaluaciones")
+            .select("*")
+            .eq("paciente_id", paciente_id)
+            .order("fecha")
+            .execute()
+        )
+        return resp.data if resp.data else []
+    except Exception:
+        return []
 
-    resp = supabase.table("evaluaciones").select("id").eq("paciente_id", paciente_id).execute()
 
-    if len(resp.data) > 0:
-        raise Exception("El paciente tiene evaluaciones registradas")
+@st.cache_data(ttl=300)
+def obtener_historial_paciente(paciente):
+    try:
+        respuesta = (
+            supabase.table("evaluaciones")
+            .select("*")
+            .eq("paciente", str(paciente).strip())
+            .order("fecha")
+            .execute()
+        )
+        if respuesta.data:
+            return pd.DataFrame(respuesta.data)
+        return pd.DataFrame()
+    except Exception as e:
+        st.error(f"Error al leer historial: {e}")
+        return pd.DataFrame()
 
-    supabase.table("pacientes").delete().eq("id", paciente_id).execute()
+
+@st.cache_data(ttl=300)
+def obtener_historial_peso(paciente_id):
+    try:
+        respuesta = (
+            supabase.table("seguimiento_peso")
+            .select("id,paciente_id,fecha,peso_kg,imc,created_at")
+            .eq("paciente_id", int(paciente_id))
+            .order("fecha")
+            .execute()
+        )
+
+        if respuesta.data:
+            return pd.DataFrame(respuesta.data)
+
+        return pd.DataFrame(columns=["fecha", "peso_kg", "imc"])
+    except Exception as e:
+        st.error(f"Error al leer historial de peso: {e}")
+        return pd.DataFrame(columns=["fecha", "peso_kg", "imc"])
+
+
+@st.cache_data(ttl=300)
+def obtener_historial_medicacion(paciente_id):
+    try:
+        respuesta = (
+            supabase.table("medicacion_evolucion")
+            .select("*")
+            .eq("paciente_id", int(paciente_id))
+            .order("fecha_cambio", desc=True)
+            .execute()
+        )
+
+        if respuesta.data:
+            return pd.DataFrame(respuesta.data)
+
+        return pd.DataFrame(columns=[
+            "fecha_cambio",
+            "droga",
+            "dosis",
+            "unidad",
+            "frecuencia",
+            "via_administracion",
+            "estado",
+            "observaciones"
+        ])
+    except Exception as e:
+        st.error(f"Error al leer historial de medicación: {e}")
+        return pd.DataFrame(columns=[
+            "fecha_cambio",
+            "droga",
+            "dosis",
+            "unidad",
+            "frecuencia",
+            "via_administracion",
+            "estado",
+            "observaciones"
+        ])
+
+
+@st.cache_data(ttl=300)
+def obtener_historial_inbody(paciente_id):
+    try:
+        respuesta = (
+            supabase.table("inbody_registros")
+            .select("*")
+            .eq("paciente_id", int(paciente_id))
+            .order("fecha", desc=True)
+            .execute()
+        )
+
+        if respuesta.data:
+            return pd.DataFrame(respuesta.data)
+
+        return pd.DataFrame()
+
+    except Exception as e:
+        st.error(f"Error al leer historial de composición corporal: {e}")
+        return pd.DataFrame()
+
+
 # =========================================================
 # TABLAS NORMATIVAS
 # =========================================================
@@ -214,8 +316,12 @@ TABLA_SILLA = {
 }
 
 # =========================================================
-# BASE DE DATOS
+# BASE DE DATOS - ESCRITURAS
 # =========================================================
+def limpiar_cache():
+    st.cache_data.clear()
+
+
 def guardar_evaluacion(paciente_nombre, sexo, edad, prueba, valor_medido, percentil, clasificacion):
     payload = {
         "fecha": datetime.now().strftime("%Y-%m-%d"),
@@ -227,7 +333,9 @@ def guardar_evaluacion(paciente_nombre, sexo, edad, prueba, valor_medido, percen
         "percentil": round(float(percentil), 1) if percentil is not None else None,
         "clasificacion": str(clasificacion).strip()
     }
-    return supabase.table("evaluaciones").insert(payload).execute()
+    resp = supabase.table("evaluaciones").insert(payload).execute()
+    limpiar_cache()
+    return resp
 
 
 def guardar_paciente(nombre, sexo, fecha_nacimiento, talla_m):
@@ -254,7 +362,20 @@ def guardar_paciente(nombre, sexo, fecha_nacimiento, talla_m):
         "talla_m": round(float(talla_m), 2)
     }
 
-    return supabase.table("pacientes").insert(payload).execute()
+    resp = supabase.table("pacientes").insert(payload).execute()
+    limpiar_cache()
+    return resp
+
+
+def eliminar_paciente(paciente_id):
+    resp = supabase.table("evaluaciones").select("id").eq("paciente_id", paciente_id).execute()
+
+    if len(resp.data) > 0:
+        raise Exception("El paciente tiene evaluaciones registradas")
+
+    resp_del = supabase.table("pacientes").delete().eq("id", paciente_id).execute()
+    limpiar_cache()
+    return resp_del
 
 
 def guardar_peso(paciente_id, fecha_medicion, peso_kg, talla_m):
@@ -276,7 +397,9 @@ def guardar_peso(paciente_id, fecha_medicion, peso_kg, talla_m):
         "imc": imc
     }
 
-    return supabase.table("seguimiento_peso").insert(payload).execute()
+    resp = supabase.table("seguimiento_peso").insert(payload).execute()
+    limpiar_cache()
+    return resp
 
 
 def guardar_medicacion(
@@ -308,109 +431,9 @@ def guardar_medicacion(
         "observaciones": str(observaciones).strip() if observaciones else None
     }
 
-    return supabase.table("medicacion_evolucion").insert(payload).execute()
-
-
-def clasificar_imc(imc_calculado):
-    if imc_calculado < 18.5:
-        return "Bajo peso", "🔵"
-    elif imc_calculado < 25:
-        return "Normal", "🟢"
-    elif imc_calculado < 30:
-        return "Sobrepeso", "🟡"
-    else:
-        return "Obesidad", "🔴"
-
-
-def eliminar_evaluacion(id_registro):
-    return supabase.table("evaluaciones").delete().eq("id", id_registro).execute()
-
-@st.cache_data(ttl=300)
-def obtener_historial_paciente(paciente):
-    try:
-        respuesta = (
-            supabase.table("evaluaciones")
-            .select("*")
-            .eq("paciente", str(paciente).strip())
-            .order("fecha")
-            .execute()
-        )
-        if respuesta.data:
-            return pd.DataFrame(respuesta.data)
-        return pd.DataFrame()
-    except Exception as e:
-        st.error(f"Error al leer historial: {e}")
-        return pd.DataFrame()
-
-
-def obtener_historial_peso(paciente_id):
-    try:
-        respuesta = (
-            supabase.table("seguimiento_peso")
-            .select("id,paciente_id,fecha,peso_kg,imc,created_at")
-            .eq("paciente_id", int(paciente_id))
-            .order("fecha")
-            .execute()
-        )
-
-        if respuesta.data:
-            return pd.DataFrame(respuesta.data)
-
-        return pd.DataFrame(columns=["fecha", "peso_kg", "imc"])
-    except Exception as e:
-        st.error(f"Error al leer historial de peso: {e}")
-        return pd.DataFrame(columns=["fecha", "peso_kg", "imc"])
-
-
-def obtener_historial_medicacion(paciente_id):
-    try:
-        respuesta = (
-            supabase.table("medicacion_evolucion")
-            .select("*")
-            .eq("paciente_id", int(paciente_id))
-            .order("fecha_cambio", desc=True)
-            .execute()
-        )
-
-        if respuesta.data:
-            return pd.DataFrame(respuesta.data)
-
-        return pd.DataFrame(columns=[
-            "fecha_cambio",
-            "droga",
-            "dosis",
-            "unidad",
-            "frecuencia",
-            "via_administracion",
-            "estado",
-            "observaciones"
-        ])
-    except Exception as e:
-        st.error(f"Error al leer historial de medicación: {e}")
-        return pd.DataFrame(columns=[
-            "fecha_cambio",
-            "droga",
-            "dosis",
-            "unidad",
-            "frecuencia",
-            "via_administracion",
-            "estado",
-            "observaciones"
-        ])
-
-
-def obtener_pacientes():
-    try:
-        respuesta = (
-            supabase.table("pacientes")
-            .select("id,nombre,sexo,fecha_nacimiento,talla_m")
-            .order("nombre")
-            .execute()
-        )
-        return respuesta.data if respuesta.data else []
-    except Exception as e:
-        st.error(f"Error al leer pacientes: {e}")
-        return []
+    resp = supabase.table("medicacion_evolucion").insert(payload).execute()
+    limpiar_cache()
+    return resp
 
 
 def guardar_inbody(
@@ -440,89 +463,68 @@ def guardar_inbody(
         "observaciones": str(observaciones).strip() if observaciones else None
     }
 
-    return supabase.table("inbody_registros").insert(payload).execute()
+    resp = supabase.table("inbody_registros").insert(payload).execute()
+    limpiar_cache()
+    return resp
 
 
-def obtener_historial_inbody(paciente_id):
-    try:
-        respuesta = (
-            supabase.table("inbody_registros")
-            .select("*")
-            .eq("paciente_id", int(paciente_id))
-            .order("fecha", desc=True)
-            .execute()
-        )
-
-        if respuesta.data:
-            return pd.DataFrame(respuesta.data)
-
-        return pd.DataFrame()
-
-    except Exception as e:
-        st.error(f"Error al leer historial de composición corporal: {e}")
-        return pd.DataFrame()
+def eliminar_evaluacion(id_registro):
+    resp = supabase.table("evaluaciones").delete().eq("id", id_registro).execute()
+    limpiar_cache()
+    return resp
 
 
-def obtener_ficha_paciente(paciente_nombre):
-    try:
-        paciente_nombre = str(paciente_nombre).strip()
-
-        respuesta_paciente = (
-            supabase.table("pacientes")
-            .select("id,nombre,sexo,fecha_nacimiento,talla_m,created_at")
-            .eq("nombre", paciente_nombre)
-            .limit(1)
-            .execute()
-        )
-
-        datos_paciente = respuesta_paciente.data[0] if respuesta_paciente.data else {}
-        df_historial = obtener_historial_paciente(paciente_nombre)
-
-        cantidad_evaluaciones = 0
-        ultima_fecha = "-"
-        ultima_clasificacion = "-"
-        ultima_prueba = "-"
-
-        if not df_historial.empty:
-            if "fecha" in df_historial.columns:
-                df_historial["fecha"] = pd.to_datetime(df_historial["fecha"], errors="coerce")
-                df_historial = df_historial.sort_values("fecha", ascending=False)
-
-            cantidad_evaluaciones = len(df_historial)
-
-            if "fecha" in df_historial.columns and pd.notna(df_historial.iloc[0]["fecha"]):
-                ultima_fecha = df_historial.iloc[0]["fecha"].strftime("%d-%m-%Y")
-
-            if "clasificacion" in df_historial.columns and pd.notna(df_historial.iloc[0]["clasificacion"]):
-                ultima_clasificacion = str(df_historial.iloc[0]["clasificacion"])
-
-            if "prueba" in df_historial.columns and pd.notna(df_historial.iloc[0]["prueba"]):
-                ultima_prueba = str(df_historial.iloc[0]["prueba"])
-
-        return {
-            "id": datos_paciente.get("id"),
-            "nombre": datos_paciente.get("nombre", paciente_nombre),
-            "sexo": datos_paciente.get("sexo", "-"),
-            "fecha_nacimiento": datos_paciente.get("fecha_nacimiento"),
-            "talla_m": datos_paciente.get("talla_m"),
-            "cantidad_evaluaciones": cantidad_evaluaciones,
-            "ultima_fecha": ultima_fecha,
-            "ultima_clasificacion": ultima_clasificacion,
-            "ultima_prueba": ultima_prueba
-        }
-
-    except Exception as e:
-        st.error(f"Error al cargar ficha del paciente: {e}")
+# =========================================================
+# UTILIDADES PACIENTE / FICHA
+# =========================================================
+def construir_ficha_paciente(paciente_actual, df_historial):
+    if paciente_actual is None:
         return {
             "id": None,
-            "nombre": paciente_nombre,
+            "nombre": "-",
             "sexo": "-",
+            "fecha_nacimiento": None,
             "talla_m": None,
             "cantidad_evaluaciones": 0,
             "ultima_fecha": "-",
             "ultima_clasificacion": "-",
             "ultima_prueba": "-"
         }
+
+    cantidad_evaluaciones = 0
+    ultima_fecha = "-"
+    ultima_clasificacion = "-"
+    ultima_prueba = "-"
+
+    if df_historial is not None and not df_historial.empty:
+        df_tmp = df_historial.copy()
+
+        if "fecha" in df_tmp.columns:
+            df_tmp["fecha"] = pd.to_datetime(df_tmp["fecha"], errors="coerce")
+            df_tmp = df_tmp.sort_values("fecha", ascending=False)
+
+        cantidad_evaluaciones = len(df_tmp)
+
+        if "fecha" in df_tmp.columns and pd.notna(df_tmp.iloc[0]["fecha"]):
+            ultima_fecha = df_tmp.iloc[0]["fecha"].strftime("%d-%m-%Y")
+
+        if "clasificacion" in df_tmp.columns and pd.notna(df_tmp.iloc[0]["clasificacion"]):
+            ultima_clasificacion = str(df_tmp.iloc[0]["clasificacion"])
+
+        if "prueba" in df_tmp.columns and pd.notna(df_tmp.iloc[0]["prueba"]):
+            ultima_prueba = str(df_tmp.iloc[0]["prueba"])
+
+    return {
+        "id": paciente_actual.get("id"),
+        "nombre": paciente_actual.get("nombre", "-"),
+        "sexo": paciente_actual.get("sexo", "-"),
+        "fecha_nacimiento": paciente_actual.get("fecha_nacimiento"),
+        "talla_m": paciente_actual.get("talla_m"),
+        "cantidad_evaluaciones": cantidad_evaluaciones,
+        "ultima_fecha": ultima_fecha,
+        "ultima_clasificacion": ultima_clasificacion,
+        "ultima_prueba": ultima_prueba
+    }
 
 
 def preparar_df_exportacion(df):
@@ -677,6 +679,17 @@ def generar_recomendacion_corporal(estado, clasif_grasa, clasif_visceral, clasif
             return "Estado general aceptable, pero conviene reforzar trabajo de fuerza."
         return "Mantener hábitos actuales y seguimiento periódico."
     return "Completar datos clínicos y repetir control."
+
+
+def clasificar_imc(imc_calculado):
+    if imc_calculado < 18.5:
+        return "Bajo peso", "🔵"
+    elif imc_calculado < 25:
+        return "Normal", "🟢"
+    elif imc_calculado < 30:
+        return "Sobrepeso", "🟡"
+    else:
+        return "Obesidad", "🔴"
 
 
 def evaluar_perfil_morfofuncional(sexo, peso_kg, talla_m, grasa_pct, masa_muscular_kg, agua_pct, grasa_visceral):
@@ -1036,6 +1049,7 @@ def generar_df_analisis_cientifico(ficha, df_peso, df_inbody, df_eval, df_medica
 
     return df_final
 
+
 # =========================================================
 # EXPORTACIÓN EXCEL
 # =========================================================
@@ -1071,12 +1085,10 @@ def _formatear_hoja_excel(ws):
         for cell in row:
             cell.alignment = Alignment(vertical="top", wrap_text=True)
 
+
 def generar_tabla_estadistica(ficha, df_peso, df_inbody, df_eval, df_medicacion):
     from functools import reduce
 
-    # -----------------------------
-    # PESO
-    # -----------------------------
     if df_peso is not None and not df_peso.empty:
         peso = df_peso.copy()
         peso["fecha"] = pd.to_datetime(peso["fecha"], errors="coerce")
@@ -1084,9 +1096,6 @@ def generar_tabla_estadistica(ficha, df_peso, df_inbody, df_eval, df_medicacion)
     else:
         peso = pd.DataFrame(columns=["fecha", "peso_kg", "imc"])
 
-    # -----------------------------
-    # INBODY
-    # -----------------------------
     if df_inbody is not None and not df_inbody.empty:
         inbody = df_inbody.copy()
         inbody["fecha"] = pd.to_datetime(inbody["fecha"], errors="coerce")
@@ -1108,9 +1117,6 @@ def generar_tabla_estadistica(ficha, df_peso, df_inbody, df_eval, df_medicacion)
             "grasa_visceral"
         ])
 
-    # -----------------------------
-    # EVALUACIONES
-    # -----------------------------
     if df_eval is not None and not df_eval.empty:
         evals = df_eval.copy()
         evals["fecha"] = pd.to_datetime(evals["fecha"], errors="coerce")
@@ -1128,9 +1134,6 @@ def generar_tabla_estadistica(ficha, df_peso, df_inbody, df_eval, df_medicacion)
         silla = pd.DataFrame(columns=["fecha", "SitToStand_rep", "SitToStand_percentil"])
         caminata = pd.DataFrame(columns=["fecha", "Caminata6m_m", "Caminata6m_percentil"])
 
-    # -----------------------------
-    # MEDICACION
-    # -----------------------------
     if df_medicacion is not None and not df_medicacion.empty:
         med = df_medicacion.copy()
         med["fecha_cambio"] = pd.to_datetime(med["fecha_cambio"], errors="coerce")
@@ -1157,9 +1160,6 @@ def generar_tabla_estadistica(ficha, df_peso, df_inbody, df_eval, df_medicacion)
     else:
         med = pd.DataFrame(columns=["fecha", "Droga", "Dosis", "Unidad", "Frecuencia", "Via", "Estado"])
 
-    # -----------------------------
-    # MERGE GLOBAL
-    # -----------------------------
     dfs = [peso, inbody, prension, silla, caminata, med]
     dfs_validos = [df for df in dfs if df is not None]
 
@@ -1183,18 +1183,15 @@ def generar_tabla_estadistica(ficha, df_peso, df_inbody, df_eval, df_medicacion)
         inplace=True
     )
 
-    # Identificación del paciente
     df_final.insert(0, "PacienteID_Ficha", ficha.get("id"))
     df_final.insert(0, "Paciente", ficha.get("nombre"))
     df_final.insert(2, "Sexo", ficha.get("sexo"))
     df_final.insert(3, "FechaNacimiento", ficha.get("fecha_nacimiento"))
 
-    # Edad al momento de cada medición
     df_final["Fecha"] = pd.to_datetime(df_final["Fecha"], errors="coerce")
     df_final["FechaNacimiento"] = pd.to_datetime(df_final["FechaNacimiento"], errors="coerce")
     df_final["Edad"] = ((df_final["Fecha"] - df_final["FechaNacimiento"]).dt.days / 365.25).round(1)
 
-    # Orden final de columnas
     columnas_orden = [
         "Paciente",
         "PacienteID_Ficha",
@@ -1228,10 +1225,8 @@ def generar_tabla_estadistica(ficha, df_peso, df_inbody, df_eval, df_medicacion)
     return df_final
 
 
-def generar_excel_paciente(ficha, df_peso, df_inbody, df_eval, df_medicacion):
+def generar_excel_general(pacientes):
     output = BytesIO()
-
-    pacientes = obtener_pacientes()
     tablas = []
 
     for p in pacientes:
@@ -1306,6 +1301,7 @@ def generar_excel_paciente(ficha, df_peso, df_inbody, df_eval, df_medicacion):
 
     output.seek(0)
     return output
+
 
 # =========================================================
 # EXPORTACIÓN PDF
@@ -1408,7 +1404,7 @@ def generar_pdf_paciente(ficha, df_peso, df_inbody, df_eval, df_medicacion):
     )
     df_analisis_pdf = _df_para_pdf(df_analisis_pdf)
 
-    if not df_inbody_pdf.empty:
+    if df_inbody_pdf is not None and not df_inbody_pdf.empty:
         df_inbody_pdf = enriquecer_historial_corporal(
             df_inbody_pdf,
             str(ficha["sexo"]).strip().lower(),
@@ -1499,6 +1495,7 @@ def generar_pdf_paciente(ficha, df_peso, df_inbody, df_eval, df_medicacion):
     doc.build(story)
     buffer.seek(0)
     return buffer
+
 
 # =========================================================
 # UTILIDADES CLÍNICAS - FUNCIONALES
@@ -1712,7 +1709,12 @@ with st.expander("➕ Nuevo paciente"):
             st.warning("Ingresá el nombre del paciente.")
         else:
             try:
-                guardar_paciente(nuevo_nombre, nuevo_sexo, nueva_talla)
+                guardar_paciente(
+                    nombre=nuevo_nombre,
+                    sexo=nuevo_sexo,
+                    fecha_nacimiento=nueva_fecha_nacimiento,
+                    talla_m=nueva_talla
+                )
                 st.success("Paciente agregado correctamente.")
                 st.rerun()
             except Exception as e:
@@ -1761,44 +1763,52 @@ with top4:
 # =========================================================
 # FICHA + DATAFRAMES BASE
 # =========================================================
-ficha = obtener_ficha_paciente(paciente_nombre)
 df_peso_export = obtener_historial_peso(paciente_id) if paciente_id is not None else pd.DataFrame()
 df_inbody_export = obtener_historial_inbody(paciente_id) if paciente_id is not None else pd.DataFrame()
 df_eval_export = obtener_historial_paciente(paciente_nombre) if paciente_nombre else pd.DataFrame()
 df_medicacion_export = obtener_historial_medicacion(paciente_id) if paciente_id is not None else pd.DataFrame()
 
-excel_buffer = generar_excel_paciente(
-    ficha,
-    df_peso_export,
-    df_inbody_export,
-    df_eval_export,
-    df_medicacion_export
-)
-pdf_buffer = generar_pdf_paciente(
-    ficha,
-    df_peso_export,
-    df_inbody_export,
-    df_eval_export,
-    df_medicacion_export
-)
+ficha = construir_ficha_paciente(paciente_actual, df_eval_export)
+
+# =========================================================
+# EXPORTACIONES ON DEMAND
+# =========================================================
+excel_state_key = "excel_general_bytes"
+pdf_state_key = f"pdf_paciente_{paciente_id}"
 
 with top2:
-    st.download_button(
-        label="Descargar Excel",
-        data=excel_buffer.getvalue(),
-        file_name=f"{paciente_nombre.replace(' ', '_')}_reporte.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        key=f"descargar_excel_{paciente_id}"
-    )
+    if st.button("Preparar Excel", key="btn_preparar_excel"):
+        with st.spinner("Generando Excel..."):
+            st.session_state[excel_state_key] = generar_excel_general(pacientes).getvalue()
+
+    if excel_state_key in st.session_state:
+        st.download_button(
+            label="Descargar Excel",
+            data=st.session_state[excel_state_key],
+            file_name="reporte_pacientes.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            key="descargar_excel_final"
+        )
 
 with top3:
-    st.download_button(
-        label="Descargar PDF",
-        data=pdf_buffer.getvalue(),
-        file_name=f"{paciente_nombre.replace(' ', '_')}_reporte.pdf",
-        mime="application/pdf",
-        key=f"descargar_pdf_{paciente_id}"
-    )
+    if st.button("Preparar PDF", key=f"btn_preparar_pdf_{paciente_id}"):
+        with st.spinner("Generando PDF..."):
+            st.session_state[pdf_state_key] = generar_pdf_paciente(
+                ficha,
+                df_peso_export,
+                df_inbody_export,
+                df_eval_export,
+                df_medicacion_export
+            ).getvalue()
+
+    if pdf_state_key in st.session_state:
+        st.download_button(
+            label="Descargar PDF",
+            data=st.session_state[pdf_state_key],
+            file_name=f"{paciente_nombre.replace(' ', '_')}_reporte.pdf",
+            mime="application/pdf",
+            key=f"descargar_pdf_final_{paciente_id}"
+        )
 
 st.divider()
 
@@ -2020,7 +2030,7 @@ with right:
     st.markdown("## Evaluación funcional")
 
     with st.container(border=True):
-        paciente_sexo_guardado = next((p["sexo"] for p in pacientes if p["nombre"] == paciente_nombre), None)
+        paciente_sexo_guardado = paciente_actual["sexo"] if paciente_actual else None
 
         prueba = st.selectbox(
             "Seleccionar prueba",
@@ -2239,7 +2249,7 @@ with m2:
     with st.container(border=True):
         st.markdown("### Historial de medicación")
 
-        df_medicacion = obtener_historial_medicacion(paciente_id)
+        df_medicacion = df_medicacion_export.copy()
 
         if not df_medicacion.empty:
             if "fecha_cambio" in df_medicacion.columns:
@@ -2278,7 +2288,7 @@ h1, h2 = st.columns([1, 1])
 with h1:
     st.markdown("## Historial corporal")
 
-    df_inbody = obtener_historial_inbody(paciente_id)
+    df_inbody = df_inbody_export.copy()
     if not df_inbody.empty:
         df_inbody = enriquecer_historial_corporal(
             df_inbody,
@@ -2323,10 +2333,9 @@ with h1:
 with h2:
     st.markdown("## Historial funcional")
 
-    df_historial = obtener_historial_paciente(paciente_nombre)
+    df_historial = df_eval_export.copy()
 
     if not df_historial.empty:
-
         filtro_historial_global = st.selectbox(
             "Filtrar historial por prueba",
             options=["Todas", "Caminata 6 minutos", "Prensión manual", "Levantarse de la silla"],
@@ -2359,7 +2368,6 @@ with h2:
         st.markdown("**Fecha | Prueba | Valor | Percentil | Clasificación | Eliminar**")
 
         for _, row in df_historial_mostrar.iterrows():
-
             c1, c2, c3, c4, c5, c6 = st.columns([1, 2, 1, 1, 1, 0.5])
 
             c1.write(row.get("fecha", ""))
@@ -2391,190 +2399,188 @@ g1, g2 = st.columns([1, 1])
 with g1:
     st.markdown("### Evolución de peso e IMC")
 
-    if paciente_id is not None:
-        df_peso = obtener_historial_peso(paciente_id)
+    df_peso = df_peso_export.copy()
+
+    if not df_peso.empty:
+        df_peso["fecha"] = pd.to_datetime(df_peso["fecha"], errors="coerce")
+        df_peso["peso_kg"] = pd.to_numeric(df_peso["peso_kg"], errors="coerce")
+        df_peso["imc"] = pd.to_numeric(df_peso["imc"], errors="coerce")
+        df_peso = df_peso.dropna(subset=["fecha", "peso_kg", "imc"]).sort_values("fecha", ascending=True)
 
         if not df_peso.empty:
-            df_peso["fecha"] = pd.to_datetime(df_peso["fecha"], errors="coerce")
-            df_peso["peso_kg"] = pd.to_numeric(df_peso["peso_kg"], errors="coerce")
-            df_peso["imc"] = pd.to_numeric(df_peso["imc"], errors="coerce")
-            df_peso = df_peso.dropna(subset=["fecha", "peso_kg", "imc"]).sort_values("fecha", ascending=True)
+            df_peso["fecha_str"] = df_peso["fecha"].dt.strftime("%Y-%m-%d")
 
-            if not df_peso.empty:
-                df_peso["fecha_str"] = df_peso["fecha"].dt.strftime("%Y-%m-%d")
+            valor_max = max(df_peso["peso_kg"].max(), df_peso["imc"].max())
+            valor_max = max(10, round(valor_max * 1.10, 1))
 
-                valor_max = max(df_peso["peso_kg"].max(), df_peso["imc"].max())
-                valor_max = max(10, round(valor_max * 1.10, 1))
+            df_peso_long = df_peso.melt(
+                id_vars=["fecha_str"],
+                value_vars=["peso_kg", "imc"],
+                var_name="variable",
+                value_name="valor"
+            )
 
-                df_peso_long = df_peso.melt(
-                    id_vars=["fecha_str"],
-                    value_vars=["peso_kg", "imc"],
-                    var_name="variable",
-                    value_name="valor"
+            grafico_doble = (
+                alt.Chart(df_peso_long)
+                .mark_line(point=True)
+                .encode(
+                    x=alt.X("fecha_str:O", title="Fecha"),
+                    y=alt.Y(
+                        "valor:Q",
+                        title="Valor",
+                        scale=alt.Scale(domain=[0, valor_max], nice=False, zero=True)
+                    ),
+                    color=alt.Color("variable:N", title="Serie"),
+                    tooltip=[
+                        alt.Tooltip("fecha_str:O", title="Fecha"),
+                        alt.Tooltip("variable:N", title="Serie"),
+                        alt.Tooltip("valor:Q", title="Valor", format=".2f")
+                    ]
                 )
+                .properties(height=320)
+            )
 
-                grafico_doble = (
-                    alt.Chart(df_peso_long)
-                    .mark_line(point=True)
-                    .encode(
-                        x=alt.X("fecha_str:O", title="Fecha"),
-                        y=alt.Y(
-                            "valor:Q",
-                            title="Valor",
-                            scale=alt.Scale(domain=[0, valor_max], nice=False, zero=True)
-                        ),
-                        color=alt.Color("variable:N", title="Serie"),
-                        tooltip=[
-                            alt.Tooltip("fecha_str:O", title="Fecha"),
-                            alt.Tooltip("variable:N", title="Serie"),
-                            alt.Tooltip("valor:Q", title="Valor", format=".2f")
-                        ]
-                    )
-                    .properties(height=320)
-                )
-
-                st.altair_chart(grafico_doble, use_container_width=True)
-            else:
-                st.info("Sin datos válidos de peso / IMC.")
+            st.altair_chart(grafico_doble, use_container_width=True)
         else:
-            st.info("Sin datos de peso / IMC.")
+            st.info("Sin datos válidos de peso / IMC.")
+    else:
+        st.info("Sin datos de peso / IMC.")
 
 with g2:
     st.markdown("### Evolución del percentil funcional")
 
-    if paciente_nombre:
-        df_historial = obtener_historial_paciente(paciente_nombre)
+    df_historial = df_eval_export.copy()
 
-        if not df_historial.empty and {"fecha", "percentil", "prueba", "clasificacion"}.issubset(df_historial.columns):
-            df_graf_base = df_historial.copy()
-            df_graf_base["fecha"] = pd.to_datetime(df_graf_base["fecha"], errors="coerce")
-            df_graf_base["percentil"] = pd.to_numeric(df_graf_base["percentil"], errors="coerce")
-            df_graf_base["prueba"] = df_graf_base["prueba"].astype(str).str.strip()
-            df_graf_base["clasificacion"] = df_graf_base["clasificacion"].astype(str).str.strip()
-            df_graf_base = df_graf_base.dropna(subset=["fecha", "percentil", "prueba"])
+    if not df_historial.empty and {"fecha", "percentil", "prueba", "clasificacion"}.issubset(df_historial.columns):
+        df_graf_base = df_historial.copy()
+        df_graf_base["fecha"] = pd.to_datetime(df_graf_base["fecha"], errors="coerce")
+        df_graf_base["percentil"] = pd.to_numeric(df_graf_base["percentil"], errors="coerce")
+        df_graf_base["prueba"] = df_graf_base["prueba"].astype(str).str.strip()
+        df_graf_base["clasificacion"] = df_graf_base["clasificacion"].astype(str).str.strip()
+        df_graf_base = df_graf_base.dropna(subset=["fecha", "percentil", "prueba"])
 
-            filtro_historial = st.session_state.get("filtro_historial_prueba", "Todas")
-            opciones_prueba = ["Caminata 6 minutos", "Prensión manual", "Levantarse de la silla"]
+        filtro_historial = st.session_state.get("filtro_historial_prueba", "Todas")
+        opciones_prueba = ["Caminata 6 minutos", "Prensión manual", "Levantarse de la silla"]
 
-            if filtro_historial != "Todas":
-                prueba_grafico = filtro_historial
-                st.markdown(f"**Prueba para gráfico:** {prueba_grafico}")
-            else:
-                prueba_grafico = st.selectbox(
-                    "Prueba para gráfico",
-                    options=opciones_prueba,
-                    key="selector_grafico_prueba"
-                )
-
-            df_prueba = df_graf_base[df_graf_base["prueba"] == prueba_grafico].copy()
-
-            if not df_prueba.empty:
-                df_prueba = (
-                    df_prueba.sort_values("fecha")
-                    .groupby("fecha", as_index=False)
-                    .agg({
-                        "percentil": "mean",
-                        "clasificacion": "last"
-                    })
-                )
-
-                df_prueba["fecha_str"] = df_prueba["fecha"].dt.strftime("%Y-%m-%d")
-                df_prueba["Etiqueta"] = df_prueba["percentil"].apply(lambda x: f"P{round(x, 1)}")
-
-                dominio_x = df_prueba["fecha_str"].tolist()
-
-                linea_p50_df = pd.DataFrame({
-                    "fecha_str": dominio_x,
-                    "p50": [50] * len(dominio_x)
-                })
-
-                linea_p50 = alt.Chart(linea_p50_df).mark_line(strokeDash=[6, 4]).encode(
-                    x=alt.X("fecha_str:O", title="Fecha", sort=dominio_x),
-                    y=alt.Y(
-                        "p50:Q",
-                        title="Percentil",
-                        scale=alt.Scale(domain=[0, 100], nice=False, zero=True)
-                    ),
-                    tooltip=[alt.Tooltip("p50:Q", title="Referencia", format=".0f")]
-                )
-
-                linea = alt.Chart(df_prueba).mark_line().encode(
-                    x=alt.X("fecha_str:O", title="Fecha", sort=dominio_x),
-                    y=alt.Y(
-                        "percentil:Q",
-                        title="Percentil",
-                        scale=alt.Scale(domain=[0, 100], nice=False, zero=True)
-                    ),
-                    tooltip=[
-                        alt.Tooltip("fecha_str:O", title="Fecha"),
-                        alt.Tooltip("percentil:Q", title="Percentil", format=".1f"),
-                        alt.Tooltip("clasificacion:N", title="Clasificación")
-                    ]
-                )
-
-                puntos = alt.Chart(df_prueba).mark_circle(size=110).encode(
-                    x=alt.X("fecha_str:O", sort=dominio_x),
-                    y=alt.Y(
-                        "percentil:Q",
-                        scale=alt.Scale(domain=[0, 100], nice=False, zero=True)
-                    ),
-                    color=alt.Color(
-                        "clasificacion:N",
-                        title="Clasificación",
-                        scale=alt.Scale(
-                            domain=["Muy bajo", "Bajo", "Ligeramente bajo", "Normal", "Bueno", "Muy bueno"],
-                            range=["#d32f2f", "#f57c00", "#fbc02d", "#388e3c", "#1976d2", "#00796b"]
-                        )
-                    ),
-                    tooltip=[
-                        alt.Tooltip("fecha_str:O", title="Fecha"),
-                        alt.Tooltip("percentil:Q", title="Percentil", format=".1f"),
-                        alt.Tooltip("clasificacion:N", title="Clasificación")
-                    ]
-                )
-
-                etiquetas = alt.Chart(df_prueba).mark_text(
-                    dy=-12,
-                    fontSize=12
-                ).encode(
-                    x=alt.X("fecha_str:O", sort=dominio_x),
-                    y=alt.Y(
-                        "percentil:Q",
-                        scale=alt.Scale(domain=[0, 100], nice=False, zero=True)
-                    ),
-                    text="Etiqueta:N"
-                )
-
-                grafico = (linea_p50 + linea + puntos + etiquetas).properties(height=320)
-                st.altair_chart(grafico, use_container_width=True)
-
-                ultimo = df_prueba["percentil"].iloc[-1]
-
-                if len(df_prueba) >= 2:
-                    anterior = df_prueba["percentil"].iloc[-2]
-                    diferencia = round(ultimo - anterior, 1)
-
-                    fecha_ult = df_prueba["fecha"].iloc[-1]
-                    fecha_ant = df_prueba["fecha"].iloc[-2]
-                    dias = (fecha_ult - fecha_ant).days if pd.notna(fecha_ult) and pd.notna(fecha_ant) else None
-
-                    if diferencia > 0:
-                        if dias is not None:
-                            st.success(f"Tendencia funcional favorable: +{diferencia} percentiles en {dias} días.")
-                        else:
-                            st.success(f"Tendencia funcional favorable: +{diferencia} percentiles.")
-                    elif diferencia < 0:
-                        if dias is not None:
-                            st.warning(f"Tendencia funcional desfavorable: -{abs(diferencia)} percentiles en {dias} días.")
-                        else:
-                            st.warning(f"Tendencia funcional desfavorable: -{abs(diferencia)} percentiles.")
-                    else:
-                        st.info("Tendencia funcional estable respecto de la evaluación anterior.")
-
-                elif len(df_prueba) == 1:
-                    clasif_actual = df_prueba["clasificacion"].iloc[-1]
-                    st.info(f"Una sola evaluación disponible. Clasificación actual: {clasif_actual}.")
-            else:
-                st.info("Sin datos funcionales para esa prueba.")
+        if filtro_historial != "Todas":
+            prueba_grafico = filtro_historial
+            st.markdown(f"**Prueba para gráfico:** {prueba_grafico}")
         else:
-            st.info("Sin historial funcional para graficar.")
+            prueba_grafico = st.selectbox(
+                "Prueba para gráfico",
+                options=opciones_prueba,
+                key="selector_grafico_prueba"
+            )
+
+        df_prueba = df_graf_base[df_graf_base["prueba"] == prueba_grafico].copy()
+
+        if not df_prueba.empty:
+            df_prueba = (
+                df_prueba.sort_values("fecha")
+                .groupby("fecha", as_index=False)
+                .agg({
+                    "percentil": "mean",
+                    "clasificacion": "last"
+                })
+            )
+
+            df_prueba["fecha_str"] = df_prueba["fecha"].dt.strftime("%Y-%m-%d")
+            df_prueba["Etiqueta"] = df_prueba["percentil"].apply(lambda x: f"P{round(x, 1)}")
+
+            dominio_x = df_prueba["fecha_str"].tolist()
+
+            linea_p50_df = pd.DataFrame({
+                "fecha_str": dominio_x,
+                "p50": [50] * len(dominio_x)
+            })
+
+            linea_p50 = alt.Chart(linea_p50_df).mark_line(strokeDash=[6, 4]).encode(
+                x=alt.X("fecha_str:O", title="Fecha", sort=dominio_x),
+                y=alt.Y(
+                    "p50:Q",
+                    title="Percentil",
+                    scale=alt.Scale(domain=[0, 100], nice=False, zero=True)
+                ),
+                tooltip=[alt.Tooltip("p50:Q", title="Referencia", format=".0f")]
+            )
+
+            linea = alt.Chart(df_prueba).mark_line().encode(
+                x=alt.X("fecha_str:O", title="Fecha", sort=dominio_x),
+                y=alt.Y(
+                    "percentil:Q",
+                    title="Percentil",
+                    scale=alt.Scale(domain=[0, 100], nice=False, zero=True)
+                ),
+                tooltip=[
+                    alt.Tooltip("fecha_str:O", title="Fecha"),
+                    alt.Tooltip("percentil:Q", title="Percentil", format=".1f"),
+                    alt.Tooltip("clasificacion:N", title="Clasificación")
+                ]
+            )
+
+            puntos = alt.Chart(df_prueba).mark_circle(size=110).encode(
+                x=alt.X("fecha_str:O", sort=dominio_x),
+                y=alt.Y(
+                    "percentil:Q",
+                    scale=alt.Scale(domain=[0, 100], nice=False, zero=True)
+                ),
+                color=alt.Color(
+                    "clasificacion:N",
+                    title="Clasificación",
+                    scale=alt.Scale(
+                        domain=["Muy bajo", "Bajo", "Ligeramente bajo", "Normal", "Bueno", "Muy bueno"],
+                        range=["#d32f2f", "#f57c00", "#fbc02d", "#388e3c", "#1976d2", "#00796b"]
+                    )
+                ),
+                tooltip=[
+                    alt.Tooltip("fecha_str:O", title="Fecha"),
+                    alt.Tooltip("percentil:Q", title="Percentil", format=".1f"),
+                    alt.Tooltip("clasificacion:N", title="Clasificación")
+                ]
+            )
+
+            etiquetas = alt.Chart(df_prueba).mark_text(
+                dy=-12,
+                fontSize=12
+            ).encode(
+                x=alt.X("fecha_str:O", sort=dominio_x),
+                y=alt.Y(
+                    "percentil:Q",
+                    scale=alt.Scale(domain=[0, 100], nice=False, zero=True)
+                ),
+                text="Etiqueta:N"
+            )
+
+            grafico = (linea_p50 + linea + puntos + etiquetas).properties(height=320)
+            st.altair_chart(grafico, use_container_width=True)
+
+            ultimo = df_prueba["percentil"].iloc[-1]
+
+            if len(df_prueba) >= 2:
+                anterior = df_prueba["percentil"].iloc[-2]
+                diferencia = round(ultimo - anterior, 1)
+
+                fecha_ult = df_prueba["fecha"].iloc[-1]
+                fecha_ant = df_prueba["fecha"].iloc[-2]
+                dias = (fecha_ult - fecha_ant).days if pd.notna(fecha_ult) and pd.notna(fecha_ant) else None
+
+                if diferencia > 0:
+                    if dias is not None:
+                        st.success(f"Tendencia funcional favorable: +{diferencia} percentiles en {dias} días.")
+                    else:
+                        st.success(f"Tendencia funcional favorable: +{diferencia} percentiles.")
+                elif diferencia < 0:
+                    if dias is not None:
+                        st.warning(f"Tendencia funcional desfavorable: -{abs(diferencia)} percentiles en {dias} días.")
+                    else:
+                        st.warning(f"Tendencia funcional desfavorable: -{abs(diferencia)} percentiles.")
+                else:
+                    st.info("Tendencia funcional estable respecto de la evaluación anterior.")
+
+            elif len(df_prueba) == 1:
+                clasif_actual = df_prueba["clasificacion"].iloc[-1]
+                st.info(f"Una sola evaluación disponible. Clasificación actual: {clasif_actual}.")
+        else:
+            st.info("Sin datos funcionales para esa prueba.")
+    else:
+        st.info("Sin historial funcional para graficar.")
