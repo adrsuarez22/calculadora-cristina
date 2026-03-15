@@ -83,7 +83,29 @@ SUPABASE_URL = st.secrets["SUPABASE_URL"]
 SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+@st.cache_data(ttl=300)
+def obtener_pacientes():
+    resp = (
+        supabase
+        .table("pacientes")
+        .select("id,nombre")
+        .order("nombre")
+        .execute()
+    )
+    return resp.data
 
+
+@st.cache_data(ttl=300)
+def obtener_evaluaciones(paciente_id):
+    resp = (
+        supabase
+        .table("evaluaciones")
+        .select("*")
+        .eq("paciente_id", paciente_id)
+        .order("fecha")
+        .execute()
+    )
+    return resp.data
 def eliminar_paciente(paciente_id):
 
     resp = supabase.table("evaluaciones").select("id").eq("paciente_id", paciente_id).execute()
