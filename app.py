@@ -1917,6 +1917,7 @@ if not opciones_pacientes:
 top1, top2, top3, top4 = st.columns([2, 1, 1, 1])
 
 with top1:
+
     busqueda_paciente = st.text_input(
         "Buscar paciente",
         value="",
@@ -1937,10 +1938,12 @@ with top1:
 
     paciente_nombre = st.selectbox(
         "Seleccionar paciente",
-        opciones_filtradas,
-        key="selector_paciente"
+        opciones_filtradas
     )
 
+    paciente_id = next(
+        p["id"] for p in pacientes_filtrados if p["nombre"] == paciente_nombre
+    )
 paciente_actual = next((p for p in pacientes_filtrados if p["nombre"] == paciente_nombre), None)
 paciente_id = paciente_actual["id"] if paciente_actual else None
 with top4:
