@@ -1405,8 +1405,8 @@ def generar_excel_general(pacientes):
         _formatear_hoja_excel(workbook["Datos_Estadisticos"])
         _formatear_hoja_excel(workbook["Dataset_Longitudinal"])
 
-output.seek(0)
-return output
+    output.seek(0)
+    return output
 
 # =========================================================
 # EXPORTACIÓN PDF
