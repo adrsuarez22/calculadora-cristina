@@ -114,7 +114,8 @@ def preparar_dataset_longitudinal(df_estadistico):
     df_long = df_long.sort_values(["Paciente", "Fecha", "Variable"])
 
     return df_long
-    
+
+
 # =========================================================
 # CONFIG
 # =========================================================
@@ -215,12 +216,12 @@ def obtener_evaluaciones(paciente_id):
 
 
 @st.cache_data(ttl=300)
-def obtener_historial_paciente(paciente):
+def obtener_historial_paciente(paciente_id):
     try:
         respuesta = (
             supabase.table("evaluaciones")
             .select("*")
-            .eq("paciente", str(paciente).strip())
+            .eq("paciente_id", int(paciente_id))
             .order("fecha")
             .execute()
         )
@@ -417,7 +418,10 @@ def limpiar_cache():
     st.cache_data.clear()
 
 
-def guardar_evaluacion(paciente_nombre, sexo, edad, prueba, valor_medido, percentil, clasificacion):
+def guardar_evaluacion(paciente_id, paciente_nombre, sexo, edad, prueba, valor_medido, percentil, clasificacion):
+    if paciente_id is None:
+        raise ValueError("No se encontró el id del paciente.")
+
     payload = {
         "fecha": datetime.now().strftime("%Y-%m-%d"),
         "paciente": str(paciente_nombre).strip(),
@@ -427,7 +431,7 @@ def guardar_evaluacion(paciente_nombre, sexo, edad, prueba, valor_medido, percen
         "valor_medido": float(valor_medido),
         "percentil": round(float(percentil), 1) if percentil is not None else None,
         "clasificacion": str(clasificacion).strip(),
-        "paciente_id": paciente_id
+        "paciente_id": int(paciente_id)
     }
     resp = supabase.table("evaluaciones").insert(payload).execute()
     limpiar_cache()
@@ -464,7 +468,6 @@ def guardar_paciente(nombre, sexo, fecha_nacimiento, talla_m):
 
 
 def eliminar_paciente(paciente_id):
-
     resp_del = supabase.table("pacientes").delete().eq("id", paciente_id).execute()
     limpiar_cache()
     return resp_del
@@ -540,6 +543,9 @@ def guardar_inbody(
     metabolismo_basal,
     observaciones
 ):
+    if paciente_id is None:
+        raise ValueError("No se encontró el id del paciente.")
+
     imc_calculado = round(float(peso_kg) / (float(talla_m) ** 2), 2) if peso_kg and talla_m else None
 
     payload = {
@@ -562,6 +568,12 @@ def guardar_inbody(
 
 def eliminar_evaluacion(id_registro):
     resp = supabase.table("evaluaciones").delete().eq("id", id_registro).execute()
+    limpiar_cache()
+    return resp
+
+
+def eliminar_registro_corporal(id_registro):
+    resp = supabase.table("inbody_registros").delete().eq("id", id_registro).execute()
     limpiar_cache()
     return resp
 
@@ -1331,11 +1343,10 @@ def generar_excel_general(pacientes):
         }
 
         paciente_id = p.get("id")
-        paciente_nombre = p.get("nombre")
 
         df_peso_p = obtener_historial_peso(paciente_id)
         df_inbody_p = obtener_historial_inbody(paciente_id)
-        df_eval_p = obtener_historial_paciente(paciente_nombre)
+        df_eval_p = obtener_historial_paciente(paciente_id)
         df_medicacion_p = obtener_historial_medicacion(paciente_id)
 
         tabla_p = generar_tabla_estadistica(
@@ -1380,22 +1391,21 @@ def generar_excel_general(pacientes):
             "Via",
             "Estado"
         ])
-        
+
     df_estadistico_limpio = preparar_df_estadistico(preparar_df_exportacion(df_estadistico))
     df_longitudinal = preparar_dataset_longitudinal(df_estadistico_limpio)
 
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
-
         df_estadistico_limpio.to_excel(
-        writer,
-        sheet_name="Datos_Estadisticos",
-        index=False
+            writer,
+            sheet_name="Datos_Estadisticos",
+            index=False
         )
 
         df_longitudinal.to_excel(
-        writer,
-        sheet_name="Dataset_Longitudinal",
-        index=False
+            writer,
+            sheet_name="Dataset_Longitudinal",
+            index=False
         )
 
         workbook = writer.book
@@ -1867,7 +1877,7 @@ with top4:
 # =========================================================
 df_peso_export = obtener_historial_peso(paciente_id) if paciente_id is not None else pd.DataFrame()
 df_inbody_export = obtener_historial_inbody(paciente_id) if paciente_id is not None else pd.DataFrame()
-df_eval_export = obtener_historial_paciente(paciente_nombre) if paciente_nombre else pd.DataFrame()
+df_eval_export = obtener_historial_paciente(paciente_id) if paciente_id is not None else pd.DataFrame()
 df_medicacion_export = obtener_historial_medicacion(paciente_id) if paciente_id is not None else pd.DataFrame()
 
 ficha = construir_ficha_paciente(paciente_actual, df_eval_export)
@@ -2257,6 +2267,7 @@ with right:
             else:
                 try:
                     guardar_evaluacion(
+                        paciente_id=paciente_id,
                         paciente_nombre=paciente_nombre,
                         sexo=sexo,
                         edad=edad,
@@ -2400,35 +2411,32 @@ with h1:
         df_inbody["fecha"] = pd.to_datetime(df_inbody["fecha"], errors="coerce")
         df_inbody = df_inbody.dropna(subset=["fecha"]).sort_values("fecha", ascending=False)
 
-        df_inbody_mostrar = agregar_identificacion_paciente(df_inbody, ficha, "Composicion_Corporal")
-        df_inbody_mostrar["fecha"] = pd.to_datetime(df_inbody_mostrar["fecha"], errors="coerce").dt.strftime("%Y-%m-%d")
+        st.markdown("**Fecha | Peso | IMC | % Grasa | Músculo | Diagnóstico | Eliminar**")
 
-        columnas_inbody = [
-            "Paciente",
-            "PacienteID_Ficha",
-            "Sexo",
-            "Talla_m",
-            "Origen",
-            "fecha",
-            "peso_kg",
-            "imc",
-            "grasa_corporal_pct",
-            "masa_muscular_kg",
-            "agua_corporal_pct",
-            "grasa_visceral",
-            "metabolismo_basal",
-            "diagnostico_corporal",
-            "sugerencia_corporal",
-            "motivos_corporal",
-            "observaciones"
-        ]
-        columnas_inbody = [c for c in columnas_inbody if c in df_inbody_mostrar.columns]
+        for _, row in df_inbody.iterrows():
+            c1, c2, c3, c4, c5, c6, c7 = st.columns([1.2, 1, 0.8, 1, 1, 1.8, 0.5])
 
-        st.dataframe(
-            df_inbody_mostrar[columnas_inbody],
-            use_container_width=True,
-            hide_index=True
-        )
+            fecha_txt = row["fecha"].strftime("%Y-%m-%d") if pd.notna(row.get("fecha")) else ""
+            peso_txt = f"{float(row['peso_kg']):.1f}" if pd.notna(row.get("peso_kg")) else ""
+            imc_txt = f"{float(row['imc']):.2f}" if pd.notna(row.get("imc")) else ""
+            grasa_txt = f"{float(row['grasa_corporal_pct']):.1f}" if pd.notna(row.get("grasa_corporal_pct")) else ""
+            musculo_txt = f"{float(row['masa_muscular_kg']):.1f}" if pd.notna(row.get("masa_muscular_kg")) else ""
+            diagnostico_txt = str(row.get("diagnostico_corporal", ""))
+
+            c1.write(fecha_txt)
+            c2.write(peso_txt)
+            c3.write(imc_txt)
+            c4.write(grasa_txt)
+            c5.write(musculo_txt)
+            c6.write(diagnostico_txt)
+
+            if c7.button("🗑", key=f"del_inbody_{row['id']}"):
+                try:
+                    eliminar_registro_corporal(row["id"])
+                    st.success("Registro corporal eliminado.")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error al eliminar registro corporal: {e}")
     else:
         st.info("Sin historial corporal.")
 
