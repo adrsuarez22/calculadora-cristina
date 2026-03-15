@@ -1806,6 +1806,7 @@ with st.expander("➕ Nuevo paciente"):
         value=date(1970, 1, 1),
         min_value=date(1920, 1, 1),
         max_value=date.today(),
+        format="DD/MM/YYYY",
         key="nueva_fecha_nacimiento_alta"
     )
     nueva_talla = st.number_input(
