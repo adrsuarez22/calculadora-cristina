@@ -54,6 +54,10 @@ def preparar_df_estadistico(df):
     columnas_numericas = [
         "Peso_kg",
         "IMC",
+        "Cintura_cm",
+        "Cadera_cm",
+        "ICC",
+        "ICA",
         "Grasa_pct",
         "Musculo_kg",
         "Agua_pct",
@@ -102,6 +106,10 @@ def preparar_dataset_longitudinal(df_estadistico):
     mapa_unidades = {
         "Peso_kg": "kg",
         "IMC": "kg/m2",
+        "Cintura_cm": "cm",
+        "Cadera_cm": "cm",
+        "ICC": "ratio",
+        "ICA": "ratio",
         "Grasa_pct": "%",
         "Musculo_kg": "kg",
         "Agua_pct": "%",
@@ -120,7 +128,7 @@ def preparar_dataset_longitudinal(df_estadistico):
 # CONFIG
 # =========================================================
 st.set_page_config(
-    page_title="Método Dra. Petratti",
+    page_title="Calculadora de Condición Física",
     page_icon="💪",
     layout="wide"
 )
@@ -283,6 +291,12 @@ def cargar_datos_paciente_en_widgets(paciente_actual, df_peso):
 
     st.session_state[f"peso_kg_{paciente_id}"] = float(peso_actual)
     st.session_state[f"inbody_peso_{paciente_id}"] = float(peso_actual)
+
+    ultimo_peso = obtener_ultimo_registro(df_peso, "fecha")
+    if ultimo_peso is not None:
+        st.session_state[f"cintura_cm_{paciente_id}"] = float(ultimo_peso.get("cintura_cm")) if pd.notna(ultimo_peso.get("cintura_cm")) else 0.0
+        st.session_state[f"cadera_cm_{paciente_id}"] = float(ultimo_peso.get("cadera_cm")) if pd.notna(ultimo_peso.get("cadera_cm")) else 0.0
+
     st.session_state["paciente_cargado_id"] = paciente_id
 # =========================================================
 # LECTURAS CACHEADAS
@@ -342,7 +356,7 @@ def obtener_historial_peso(paciente_id):
     try:
         respuesta = (
             supabase.table("seguimiento_peso")
-            .select("id,paciente_id,fecha,peso_kg,imc,created_at")
+            .select("id,paciente_id,fecha,peso_kg,imc,cintura_cm,cadera_cm,icc,ica,created_at")
             .eq("paciente_id", int(paciente_id))
             .order("fecha")
             .execute()
@@ -351,10 +365,10 @@ def obtener_historial_peso(paciente_id):
         if respuesta.data:
             return pd.DataFrame(respuesta.data)
 
-        return pd.DataFrame(columns=["fecha", "peso_kg", "imc"])
+        return pd.DataFrame(columns=["fecha", "peso_kg", "imc", "cintura_cm", "cadera_cm", "icc", "ica"])
     except Exception as e:
         st.error(f"Error al leer historial de peso: {e}")
-        return pd.DataFrame(columns=["fecha", "peso_kg", "imc"])
+        return pd.DataFrame(columns=["fecha", "peso_kg", "imc", "cintura_cm", "cadera_cm", "icc", "ica"])
 
 
 @st.cache_data(ttl=300)
@@ -577,7 +591,7 @@ def eliminar_paciente(paciente_id):
     return resp_del
 
 
-def guardar_peso(paciente_id, fecha_medicion, peso_kg, talla_m):
+def guardar_peso(paciente_id, fecha_medicion, peso_kg, talla_m, cintura_cm=None, cadera_cm=None):
     if paciente_id is None:
         raise ValueError("No se encontró el id del paciente.")
 
@@ -587,7 +601,15 @@ def guardar_peso(paciente_id, fecha_medicion, peso_kg, talla_m):
     if peso_kg is None or float(peso_kg) <= 0:
         raise ValueError("El peso debe ser mayor a 0.")
 
+    if cintura_cm is not None and float(cintura_cm) < 0:
+        raise ValueError("La cintura no puede ser negativa.")
+
+    if cadera_cm is not None and float(cadera_cm) < 0:
+        raise ValueError("La cadera no puede ser negativa.")
+
     imc = round(float(peso_kg) / (float(talla_m) ** 2), 2)
+    icc = calcular_icc(cintura_cm, cadera_cm)
+    ica = calcular_ica(cintura_cm, talla_m)
     fecha_txt = str(fecha_medicion)
 
     existente = (
@@ -602,7 +624,11 @@ def guardar_peso(paciente_id, fecha_medicion, peso_kg, talla_m):
         "paciente_id": int(paciente_id),
         "fecha": fecha_txt,
         "peso_kg": float(peso_kg),
-        "imc": imc
+        "imc": imc,
+        "cintura_cm": float(cintura_cm) if cintura_cm is not None and float(cintura_cm) > 0 else None,
+        "cadera_cm": float(cadera_cm) if cadera_cm is not None and float(cadera_cm) > 0 else None,
+        "icc": float(icc) if icc is not None else None,
+        "ica": float(ica) if ica is not None else None
     }
 
     if existente.data:
@@ -958,6 +984,56 @@ def generar_recomendacion_corporal(estado, clasif_grasa, clasif_visceral, clasif
     return "Completar datos clínicos y repetir control."
 
 
+def calcular_icc(cintura_cm, cadera_cm):
+    if cintura_cm is None or cadera_cm is None:
+        return None
+    if pd.isna(cintura_cm) or pd.isna(cadera_cm):
+        return None
+    if float(cintura_cm) <= 0 or float(cadera_cm) <= 0:
+        return None
+    return round(float(cintura_cm) / float(cadera_cm), 4)
+
+
+def calcular_ica(cintura_cm, talla_m):
+    if cintura_cm is None or talla_m is None:
+        return None
+    if pd.isna(cintura_cm) or pd.isna(talla_m):
+        return None
+    talla_cm = float(talla_m) * 100
+    if float(cintura_cm) <= 0 or talla_cm <= 0:
+        return None
+    return round(float(cintura_cm) / talla_cm, 4)
+
+
+def clasificacion_icc(sexo, icc):
+    sexo = str(sexo).strip().lower()
+
+    if icc is None or pd.isna(icc):
+        return "Sin clasificar"
+
+    if sexo == "mujer":
+        return "Riesgo aumentado" if float(icc) > 0.85 else "Riesgo no aumentado"
+
+    if sexo == "hombre":
+        return "Riesgo aumentado" if float(icc) > 0.90 else "Riesgo no aumentado"
+
+    return "Sin clasificar"
+
+
+def clasificacion_ica(ica):
+    if ica is None or pd.isna(ica):
+        return "Sin clasificar"
+
+    ica = float(ica)
+
+    if ica < 0.5:
+        return "Riesgo bajo"
+    elif ica < 0.6:
+        return "Riesgo cardiometabólico aumentado"
+    else:
+        return "Riesgo alto"
+
+
 def clasificar_imc(imc_calculado):
     if imc_calculado < 18.5:
         return "Bajo peso", "🔵"
@@ -1233,13 +1309,23 @@ def generar_df_analisis_cientifico(ficha, df_peso, df_inbody, df_eval, df_medica
 
             peso_txt = f"{round(float(peso), 1)} kg" if pd.notna(peso) else "-"
             imc_txt = f"IMC {round(float(imc), 2)}" if pd.notna(imc) else "-"
+            icc = row.get("icc")
+            ica = row.get("ica")
+            icc_txt = f"ICC {round(float(icc), 2)}" if pd.notna(icc) else ""
+            ica_txt = f"ICA {round(float(ica), 2)}" if pd.notna(ica) else ""
 
             diagnostico = clasificar_imc(imc)[0] if pd.notna(imc) else ""
+
+            partes_resultado = [peso_txt, imc_txt]
+            if icc_txt:
+                partes_resultado.append(icc_txt)
+            if ica_txt:
+                partes_resultado.append(ica_txt)
 
             filas.append({
                 "Fecha": fecha_row,
                 "Evento": "Peso / IMC",
-                "Resultado": f"{peso_txt} / {imc_txt}",
+                "Resultado": " / ".join(partes_resultado),
                 "Percentil": None,
                 "Diagnostico": diagnostico,
                 "Tratamiento": obtener_tratamiento_vigente(fecha_row)
@@ -1377,9 +1463,11 @@ def generar_tabla_estadistica(ficha, df_peso, df_inbody, df_eval, df_medicacion)
     if df_peso is not None and not df_peso.empty:
         peso = df_peso.copy()
         peso = normalizar_fecha_df(peso, "fecha")
-        peso = peso[["fecha", "peso_kg", "imc"]]
+        columnas_peso = ["fecha", "peso_kg", "imc", "cintura_cm", "cadera_cm", "icc", "ica"]
+        columnas_peso = [c for c in columnas_peso if c in peso.columns]
+        peso = peso[columnas_peso]
     else:
-        peso = pd.DataFrame(columns=["fecha", "peso_kg", "imc"])
+        peso = pd.DataFrame(columns=["fecha", "peso_kg", "imc", "cintura_cm", "cadera_cm", "icc", "ica"])
 
     if df_inbody is not None and not df_inbody.empty:
         inbody = df_inbody.copy()
@@ -1466,6 +1554,10 @@ def generar_tabla_estadistica(ficha, df_peso, df_inbody, df_eval, df_medicacion)
             "fecha": "Fecha",
             "peso_kg": "Peso_kg",
             "imc": "IMC",
+            "cintura_cm": "Cintura_cm",
+            "cadera_cm": "Cadera_cm",
+            "icc": "ICC",
+            "ica": "ICA",
             "grasa_corporal_pct": "Grasa_pct",
             "masa_muscular_kg": "Musculo_kg",
             "agua_corporal_pct": "Agua_pct",
@@ -1492,6 +1584,10 @@ def generar_tabla_estadistica(ficha, df_peso, df_inbody, df_eval, df_medicacion)
         "Fecha",
         "Peso_kg",
         "IMC",
+        "Cintura_cm",
+        "Cadera_cm",
+        "ICC",
+        "ICA",
         "Grasa_pct",
         "Musculo_kg",
         "Agua_pct",
@@ -1561,6 +1657,10 @@ def generar_excel_general(pacientes):
             "Fecha",
             "Peso_kg",
             "IMC",
+            "Cintura_cm",
+            "Cadera_cm",
+            "ICC",
+            "ICA",
             "Grasa_pct",
             "Musculo_kg",
             "Agua_pct",
@@ -1727,9 +1827,9 @@ def generar_pdf_paciente(ficha, df_peso, df_inbody, df_eval, df_medicacion):
     story.append(Paragraph("Historial de peso e IMC", styles["SubTitulo"]))
     story.append(_tabla_pdf_desde_df(
         df_peso_pdf,
-        columnas=["fecha", "peso_kg", "imc"],
-        titulos=["Fecha", "Peso (kg)", "IMC"],
-        anchos_cm=[4, 4, 3],
+        columnas=["fecha", "peso_kg", "imc", "cintura_cm", "cadera_cm", "icc", "ica"],
+        titulos=["Fecha", "Peso (kg)", "IMC", "Cintura", "Cadera", "ICC", "ICA"],
+        anchos_cm=[2.4, 2.1, 1.6, 2.0, 2.0, 1.5, 1.5],
         styles=styles
     ))
     story.append(Spacer(1, 0.35 * cm))
@@ -2096,6 +2196,20 @@ def generar_informe_integrado_paciente(ficha, df_peso, df_inbody, df_eval, df_me
             "Percentil": "-",
             "Clasificación": clasificar_imc(float(ultimo_peso.get("imc")))[0] if pd.notna(ultimo_peso.get("imc")) else "-"
         })
+        filas_resumen.append({
+            "Área": "Corporal",
+            "Variable": "Índice cintura-cadera",
+            "Valor": round(float(ultimo_peso.get("icc")), 2) if pd.notna(ultimo_peso.get("icc")) else "-",
+            "Percentil": "-",
+            "Clasificación": clasificacion_icc(sexo, ultimo_peso.get("icc")) if pd.notna(ultimo_peso.get("icc")) else "-"
+        })
+        filas_resumen.append({
+            "Área": "Corporal",
+            "Variable": "Índice cintura-altura",
+            "Valor": round(float(ultimo_peso.get("ica")), 2) if pd.notna(ultimo_peso.get("ica")) else "-",
+            "Percentil": "-",
+            "Clasificación": clasificacion_ica(ultimo_peso.get("ica")) if pd.notna(ultimo_peso.get("ica")) else "-"
+        })
 
     if ultimo_inbody is not None:
         filas_resumen.append({
@@ -2232,7 +2346,7 @@ if not pacientes:
     st.warning("No hay pacientes cargados.")
     st.stop()
 
-st.title("Método Dra. Petratti")
+st.title("Calculadora de Condición Física")
 
 col_alta_btn_1, col_alta_btn_2 = st.columns([1, 5])
 
@@ -2455,7 +2569,7 @@ with top3:
         st.download_button(
             label="Descargar PDF",
             data=st.session_state[pdf_state_key],
-            file_name=f"{paciente_nombre.replace(' ', '_')}_Metodo_Dra_Petratti.pdf",
+            file_name=f"{paciente_nombre.replace(' ', '_')}_reporte.pdf",
             mime="application/pdf",
             key=f"descargar_pdf_final_{paciente_id}"
         )
@@ -2487,6 +2601,10 @@ with k2:
             ultimo_peso = df_peso_tmp.iloc[0]
             st.write(f"**Peso:** {float(ultimo_peso['peso_kg']):.1f} kg")
             st.write(f"**IMC:** {float(ultimo_peso['imc']):.2f}")
+            if pd.notna(ultimo_peso.get('icc')):
+                st.write(f"**ICC:** {float(ultimo_peso['icc']):.2f} ({clasificacion_icc(ficha['sexo'], ultimo_peso['icc'])})")
+            if pd.notna(ultimo_peso.get('ica')):
+                st.write(f"**ICA:** {float(ultimo_peso['ica']):.2f} ({clasificacion_ica(ultimo_peso['ica'])})")
             st.write(f"**Fecha:** {ultimo_peso['fecha'].strftime('%d-%m-%Y')}")
         else:
             st.write("Sin registros")
@@ -2534,7 +2652,7 @@ with st.container(border=True):
     if ficha["talla_m"] is None or float(ficha["talla_m"]) <= 0:
         st.warning("Este paciente no tiene una talla válida cargada en la tabla pacientes.")
     else:
-        col_p1, col_p2, col_p3 = st.columns(3)
+        col_p1, col_p2, col_p3, col_p4, col_p5 = st.columns(5)
 
         with col_p1:
             fecha_peso = st.date_input(
@@ -2554,10 +2672,36 @@ with st.container(border=True):
             )
 
         with col_p3:
+            cintura_cm = st.number_input(
+                "Cintura (cm)",
+                min_value=0.0,
+                max_value=300.0,
+                step=0.1,
+                format="%.1f",
+                key=f"cintura_cm_{paciente_id}"
+            )
+
+        with col_p4:
+            cadera_cm = st.number_input(
+                "Cadera (cm)",
+                min_value=0.0,
+                max_value=300.0,
+                step=0.1,
+                format="%.1f",
+                key=f"cadera_cm_{paciente_id}"
+            )
+
+        with col_p5:
             imc_calculado = round(float(peso_kg) / (float(ficha["talla_m"]) ** 2), 2)
             clasificacion_imc, color_imc = clasificar_imc(imc_calculado)
+            icc_calculado = calcular_icc(cintura_cm, cadera_cm)
+            ica_calculado = calcular_ica(cintura_cm, ficha["talla_m"])
             st.markdown(f"**IMC:** {imc_calculado:.2f}")
             st.markdown(f"**Clasificación:** {color_imc} {clasificacion_imc}")
+            st.markdown(f"**ICC:** {icc_calculado:.2f}" if icc_calculado is not None else "**ICC:** -")
+            st.markdown(f"**Riesgo ICC:** {clasificacion_icc(ficha['sexo'], icc_calculado)}")
+            st.markdown(f"**ICA:** {ica_calculado:.2f}" if ica_calculado is not None else "**ICA:** -")
+            st.markdown(f"**Riesgo ICA:** {clasificacion_ica(ica_calculado)}")
 
         bp1, bp2 = st.columns(2)
 
@@ -2568,7 +2712,9 @@ with st.container(border=True):
                         paciente_id=paciente_id,
                         fecha_medicion=fecha_peso,
                         peso_kg=peso_kg,
-                        talla_m=ficha["talla_m"]
+                        talla_m=ficha["talla_m"],
+                        cintura_cm=cintura_cm,
+                        cadera_cm=cadera_cm
                     )
                     st.success("Peso guardado correctamente.")
                     st.rerun()
@@ -2598,20 +2744,28 @@ if not df_peso_hist.empty:
     df_peso_hist["fecha"] = pd.to_datetime(df_peso_hist["fecha"], errors="coerce")
     df_peso_hist = df_peso_hist.dropna(subset=["fecha"]).sort_values("fecha", ascending=False)
 
-    st.markdown("**Fecha | Peso | IMC | Eliminar**")
+    st.markdown("**Fecha | Peso | IMC | Cintura | Cadera | ICC | ICA | Eliminar**")
 
     for _, row in df_peso_hist.iterrows():
-        c1, c2, c3, c4 = st.columns([1.2, 1, 1, 0.5])
+        c1, c2, c3, c4, c5, c6, c7, c8 = st.columns([1.2, 0.9, 0.9, 0.9, 0.9, 0.8, 0.8, 0.5])
 
         fecha_txt = row["fecha"].strftime("%Y-%m-%d") if pd.notna(row.get("fecha")) else ""
         peso_txt = f"{float(row['peso_kg']):.1f}" if pd.notna(row.get("peso_kg")) else ""
         imc_txt = f"{float(row['imc']):.2f}" if pd.notna(row.get("imc")) else ""
+        cintura_txt = f"{float(row['cintura_cm']):.1f}" if pd.notna(row.get("cintura_cm")) else ""
+        cadera_txt = f"{float(row['cadera_cm']):.1f}" if pd.notna(row.get("cadera_cm")) else ""
+        icc_txt = f"{float(row['icc']):.2f}" if pd.notna(row.get("icc")) else ""
+        ica_txt = f"{float(row['ica']):.2f}" if pd.notna(row.get("ica")) else ""
 
         c1.write(fecha_txt)
         c2.write(peso_txt)
         c3.write(imc_txt)
+        c4.write(cintura_txt)
+        c5.write(cadera_txt)
+        c6.write(icc_txt)
+        c7.write(ica_txt)
 
-        if c4.button("🗑", key=f"del_peso_{row['id']}"):
+        if c8.button("🗑", key=f"del_peso_{row['id']}"):
             try:
                 eliminar_registro_peso(row["id"])
                 st.success("Registro de peso eliminado.")
