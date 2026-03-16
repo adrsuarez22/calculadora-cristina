@@ -2982,7 +2982,8 @@ with m1:
 
         observaciones_medicacion = st.text_area(
             "Observaciones",
-            key=f"med_obs_{paciente_id}"
+            key=f"med_obs_{paciente_id}",
+            height=80
         )
 
         if st.button("Guardar medicación", key=f"btn_guardar_medicacion_{paciente_id}"):
@@ -3030,7 +3031,8 @@ with m2:
             st.dataframe(
                 df_medicacion[columnas_medicacion],
                 use_container_width=True,
-                hide_index=True
+                hide_index=True,
+                height=260
             )
         else:
             st.info("Sin historial de medicación.")
