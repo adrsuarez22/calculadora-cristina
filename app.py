@@ -2514,91 +2514,6 @@ st.divider()
 
 
 # =========================================================
-# INFORME INTEGRADO
-# =========================================================
-informe_integrado = generar_informe_integrado_paciente(
-    ficha=ficha,
-    df_peso=df_peso_export,
-    df_inbody=df_inbody_export,
-    df_eval=df_eval_export,
-    df_medicacion=df_medicacion_export
-)
-
-st.markdown("## Informe integrado del paciente")
-
-bg_estado_global, fg_estado_global = color_estado_global_informe(informe_integrado["estado_global"])
-
-st.markdown(
-    f"""
-    <div class="result-card" style="background-color:{bg_estado_global}; color:{fg_estado_global};">
-        Estado global: {informe_integrado["estado_global"]}
-    </div>
-    """,
-    unsafe_allow_html=True
-)
-
-ii1, ii2, ii3 = st.columns(3)
-
-with ii1:
-    with st.container(border=True):
-        st.markdown("#### Funcional")
-        if informe_integrado["promedio_percentil"] is not None:
-            st.write(f"**Promedio percentilar:** P{informe_integrado['promedio_percentil']}")
-        else:
-            st.write("**Promedio percentilar:** -")
-
-        if informe_integrado["peor_percentil"] is not None:
-            st.write(f"**Peor percentil:** P{round(informe_integrado['peor_percentil'], 1)}")
-        else:
-            st.write("**Peor percentil:** -")
-
-with ii2:
-    with st.container(border=True):
-        st.markdown("#### Corporal")
-        st.write(f"**Estado corporal:** {informe_integrado['estado_corporal']}")
-        st.write(f"**Paciente:** {ficha['nombre']}")
-        st.write(f"**Sexo / talla:** {str(ficha['sexo']).capitalize() if ficha['sexo'] else '-'} / {ficha['talla_m'] if ficha['talla_m'] is not None else '-'}")
-
-with ii3:
-    with st.container(border=True):
-        st.markdown("#### Conclusión")
-        st.write(f"**Estado integrado:** {informe_integrado['estado_global']}")
-        st.write(f"**Última prueba:** {ficha['ultima_prueba']}")
-        st.write(f"**Última clasificación:** {ficha['ultima_clasificacion']}")
-
-df_tabla_resumen = informe_integrado["tabla_resumen"]
-
-if df_tabla_resumen is not None and not df_tabla_resumen.empty:
-    st.markdown("### Resumen unificado de percentiles y clasificaciones")
-    st.dataframe(
-        df_tabla_resumen,
-        use_container_width=True,
-        hide_index=True
-    )
-
-st.markdown(
-    f"""
-    <div class="motivo-box">
-        <b>Comentario clínico unificado:</b><br><br>
-        {informe_integrado["comentario_unificado"]}
-    </div>
-    """,
-    unsafe_allow_html=True
-)
-
-st.markdown(
-    f"""
-    <div class="reco-box">
-        <b>Recomendación unificada:</b><br>
-        {informe_integrado["recomendacion_final"]}
-    </div>
-    """,
-    unsafe_allow_html=True
-)
-
-st.divider()
-
-# =========================================================
 # ZONA PRINCIPAL DE TRABAJO
 # =========================================================
 left, right = st.columns([1, 1])
@@ -3377,3 +3292,89 @@ with g2:
             st.info("Sin datos funcionales para esa prueba.")
     else:
         st.info("Sin historial funcional para graficar.")
+
+# =========================================================
+# INFORME INTEGRADO
+# =========================================================
+informe_integrado = generar_informe_integrado_paciente(
+    ficha=ficha,
+    df_peso=df_peso_export,
+    df_inbody=df_inbody_export,
+    df_eval=df_eval_export,
+    df_medicacion=df_medicacion_export
+)
+
+st.markdown("## Informe integrado del paciente")
+
+bg_estado_global, fg_estado_global = color_estado_global_informe(informe_integrado["estado_global"])
+
+st.markdown(
+    f"""
+    <div class="result-card" style="background-color:{bg_estado_global}; color:{fg_estado_global};">
+        Estado global: {informe_integrado["estado_global"]}
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
+ii1, ii2, ii3 = st.columns(3)
+
+with ii1:
+    with st.container(border=True):
+        st.markdown("#### Funcional")
+        if informe_integrado["promedio_percentil"] is not None:
+            st.write(f"**Promedio percentilar:** P{informe_integrado['promedio_percentil']}")
+        else:
+            st.write("**Promedio percentilar:** -")
+
+        if informe_integrado["peor_percentil"] is not None:
+            st.write(f"**Peor percentil:** P{round(informe_integrado['peor_percentil'], 1)}")
+        else:
+            st.write("**Peor percentil:** -")
+
+with ii2:
+    with st.container(border=True):
+        st.markdown("#### Corporal")
+        st.write(f"**Estado corporal:** {informe_integrado['estado_corporal']}")
+        st.write(f"**Paciente:** {ficha['nombre']}")
+        st.write(f"**Sexo / talla:** {str(ficha['sexo']).capitalize() if ficha['sexo'] else '-'} / {ficha['talla_m'] if ficha['talla_m'] is not None else '-'}")
+
+with ii3:
+    with st.container(border=True):
+        st.markdown("#### Conclusión")
+        st.write(f"**Estado integrado:** {informe_integrado['estado_global']}")
+        st.write(f"**Última prueba:** {ficha['ultima_prueba']}")
+        st.write(f"**Última clasificación:** {ficha['ultima_clasificacion']}")
+
+df_tabla_resumen = informe_integrado["tabla_resumen"]
+
+if df_tabla_resumen is not None and not df_tabla_resumen.empty:
+    st.markdown("### Resumen unificado de percentiles y clasificaciones")
+    st.dataframe(
+        df_tabla_resumen,
+        use_container_width=True,
+        hide_index=True
+    )
+
+st.markdown(
+    f"""
+    <div class="motivo-box">
+        <b>Comentario clínico unificado:</b><br><br>
+        {informe_integrado["comentario_unificado"]}
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
+st.markdown(
+    f"""
+    <div class="reco-box">
+        <b>Recomendación unificada:</b><br>
+        {informe_integrado["recomendacion_final"]}
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
+st.divider()
+
