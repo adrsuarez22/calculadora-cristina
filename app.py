@@ -2101,7 +2101,7 @@ with top1:
 
     seleccion = st.selectbox(
         "Seleccionar paciente",
-        etiquetas
+        etiquetas 
     )
 
     indice = etiquetas.index(seleccion)
