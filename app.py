@@ -2664,7 +2664,9 @@ if not df_peso.empty:
             .properties(height=280)
         )
 
-        st.altair_chart(grafico_doble, use_container_width=True)
+        col1, col2, col3 = st.columns([1,3,1])
+        with col2:
+            st.altair_chart(grafico_doble, use_container_width=False)
     else:
         st.info("Sin datos válidos de peso / IMC.")
 else:
@@ -2982,8 +2984,11 @@ if not df_historial.empty:
                 text="Etiqueta:N"
             )
 
-            grafico = (linea_p50 + linea + puntos + etiquetas).properties(height=280)
-            st.altair_chart(grafico, use_container_width=True)
+            grafico = (linea_p50 + linea + puntos + etiquetas).properties(height=280, width=700)
+
+            col1, col2, col3 = st.columns([1,3,1])
+            with col2:
+                st.altair_chart(grafico, use_container_width=False)
         else:
             st.info("Sin datos funcionales para esa prueba.")
     else:
