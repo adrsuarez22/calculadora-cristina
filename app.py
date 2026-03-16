@@ -2080,10 +2080,10 @@ with top1:
         key="busqueda_paciente"
     )
 
-    pacientes_filtrados = [
-        p for p in pacientes
-        if busqueda_paciente.strip().lower() in str(p["nombre"]).strip().lower()
-    ]
+pacientes_filtrados = [
+    p for p in pacientes
+    if busqueda_paciente.strip().lower() in str(p["nombre"]).strip().lower()
+]    
 
     etiquetas = []
 
