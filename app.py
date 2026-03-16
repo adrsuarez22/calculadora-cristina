@@ -195,6 +195,9 @@ if "paciente_cargado_id" not in st.session_state:
 if "busqueda_paciente" not in st.session_state:
     st.session_state["busqueda_paciente"] = ""
 
+if "limpiar_busqueda_pendiente" not in st.session_state:
+    st.session_state["limpiar_busqueda_pendiente"] = False
+
 
 def calcular_edad_desde_fecha(fecha_nacimiento):
     if not fecha_nacimiento:
@@ -2097,6 +2100,10 @@ top1, top2, top3, top4 = st.columns([2, 1, 1, 1])
 
 with top1:
 
+    if st.session_state.get("limpiar_busqueda_pendiente", False):
+        st.session_state["busqueda_paciente"] = ""
+        st.session_state["limpiar_busqueda_pendiente"] = False
+
     busqueda_paciente = st.text_input(
         "Buscar paciente",
         placeholder="Escribí nombre o parte del nombre...",
@@ -2167,9 +2174,12 @@ with top4:
         else:
             try:
                 eliminar_paciente(paciente_id)
+
                 st.session_state["paciente_id_seleccionado"] = None
                 st.session_state["paciente_cargado_id"] = None
-                st.session_state["busqueda_paciente"] = ""
+                st.session_state["mostrar_form_nuevo_paciente"] = False
+                st.session_state["limpiar_busqueda_pendiente"] = True
+
                 st.success("Paciente eliminado correctamente.")
                 st.rerun()
 
