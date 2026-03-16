@@ -2514,12 +2514,17 @@ st.divider()
 
 
 # =========================================================
-# ZONA PRINCIPAL DE TRABAJO
+# INGRESO DE DATOS
 # =========================================================
-left, right = st.columns([1, 1])
+st.markdown("## Ingreso de datos")
 
-with left:
-    st.markdown("## Peso e IMC")
+# =========================================================
+# FILA 1: PESO / IMC  |  EVALUACIÓN FUNCIONAL
+# =========================================================
+fila1_col1, fila1_col2 = st.columns([1, 1])
+
+with fila1_col1:
+    st.markdown("### Peso e IMC")
 
     with st.container(border=True):
         if ficha["talla_m"] is None or float(ficha["talla_m"]) <= 0:
@@ -2579,130 +2584,8 @@ with left:
                     except Exception as e:
                         st.error(f"Error al borrar último peso: {e}")
 
-    st.markdown("## Composición corporal")
-
-    with st.container(border=True):
-        if ficha["talla_m"] is None or float(ficha["talla_m"]) <= 0:
-            st.warning("Para cargar composición corporal primero hay que tener una talla válida en el paciente.")
-        else:
-            sexo_corporal = str(ficha["sexo"]).strip().lower()
-
-            col_c1, col_c2 = st.columns(2)
-
-            with col_c1:
-                fecha_inbody = st.date_input("Fecha estudio", value=date.today(), key=f"inbody_fecha_{paciente_id}")
-                peso_inbody = st.number_input("Peso (kg)", min_value=0.0, max_value=300.0, step=0.1, key=f"inbody_peso_{paciente_id}")
-                imc_inbody_calc = round(float(peso_inbody) / (float(ficha["talla_m"]) ** 2), 2) if peso_inbody and ficha["talla_m"] else 0.0
-                st.markdown(f"**IMC calculado:** {imc_inbody_calc:.2f}")
-                grasa_pct = st.number_input("% grasa corporal", min_value=0.0, max_value=80.0, step=0.1, key=f"inbody_grasa_{paciente_id}")
-
-            with col_c2:
-                masa_muscular = st.number_input("Masa muscular (kg)", min_value=0.0, max_value=100.0, step=0.1, key=f"inbody_musculo_{paciente_id}")
-                agua_pct = st.number_input("% agua corporal", min_value=0.0, max_value=100.0, step=0.1, key=f"inbody_agua_{paciente_id}")
-                grasa_visceral = st.number_input("Grasa visceral", min_value=0.0, max_value=30.0, step=0.1, key=f"inbody_visceral_{paciente_id}")
-                metabolismo = st.number_input("Metabolismo basal", min_value=0.0, max_value=4000.0, step=10.0, key=f"inbody_metabolismo_{paciente_id}")
-
-            observaciones_inbody = st.text_area("Observaciones", key=f"inbody_obs_{paciente_id}")
-
-            resultado_corporal = evaluar_perfil_morfofuncional(
-                sexo=sexo_corporal,
-                peso_kg=peso_inbody,
-                talla_m=ficha["talla_m"],
-                grasa_pct=grasa_pct,
-                masa_muscular_kg=masa_muscular,
-                agua_pct=agua_pct,
-                grasa_visceral=grasa_visceral
-            )
-
-            bg_estado, fg_estado = color_estado_corporal(resultado_corporal["estado"])
-
-            st.markdown(
-                f"""
-                <div class="result-card" style="background-color:{bg_estado}; color:{fg_estado};">
-                    Diagnóstico corporal: {resultado_corporal["estado"]}
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
-
-            col_r1, col_r2, col_r3 = st.columns(3)
-            with col_r1:
-                st.write(f"**IMC:** {resultado_corporal['imc'] if resultado_corporal['imc'] is not None else '-'}")
-                st.write(f"**Clasificación IMC:** {resultado_corporal['clasif_imc']}")
-                st.write(f"**% grasa:** {resultado_corporal['clasif_grasa']}")
-
-            with col_r2:
-                st.write(f"**% agua corporal:** {resultado_corporal['clasif_agua']}")
-                st.write(f"**Grasa visceral:** {resultado_corporal['clasif_visceral']}")
-                st.write(f"**Músculo relativo %:** {resultado_corporal['musculo_rel_pct'] if resultado_corporal['musculo_rel_pct'] is not None else '-'}")
-
-            with col_r3:
-                st.write(f"**Clasificación muscular:** {resultado_corporal['clasif_musculo']}")
-                st.write(f"**Metabolismo basal:** {metabolismo if metabolismo is not None else '-'}")
-                st.write(f"**Sexo de referencia:** {sexo_corporal.capitalize() if sexo_corporal else '-'}")
-
-            motivos_texto = resultado_corporal["motivos"] if resultado_corporal["motivos"] else ["Sin hallazgos relevantes"]
-            motivos_html = "".join([f"<li>{m}</li>" for m in motivos_texto])
-
-            st.markdown(
-                f"""
-                <div class="motivo-box">
-                    <b>Motivos:</b>
-                    <ul style="margin-top:8px; margin-bottom:0;">
-                        {motivos_html}
-                    </ul>
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
-
-            st.markdown(
-                f"""
-                <div class="reco-box">
-                    <b>Sugerencia:</b><br>
-                    {resultado_corporal["recomendacion"]}
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
-
-            bc1, bc2 = st.columns(2)
-
-            with bc1:
-                if st.button("Guardar composición corporal", key=f"guardar_inbody_{paciente_id}"):
-                    try:
-                        guardar_inbody(
-                            paciente_id=paciente_id,
-                            fecha_estudio=fecha_inbody,
-                            peso_kg=peso_inbody,
-                            talla_m=ficha["talla_m"],
-                            grasa_corporal_pct=grasa_pct,
-                            masa_muscular_kg=masa_muscular,
-                            agua_corporal_pct=agua_pct,
-                            grasa_visceral=grasa_visceral,
-                            metabolismo_basal=metabolismo,
-                            observaciones=observaciones_inbody
-                        )
-                        st.success("Composición corporal guardada correctamente")
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Error al guardar composición corporal: {e}")
-
-            with bc2:
-                if st.button(
-                    "Borrar última composición",
-                    key=f"btn_borrar_ultimo_inbody_{paciente_id}",
-                    disabled=ultimo_id_inbody is None
-                ):
-                    try:
-                        eliminar_registro_corporal(ultimo_id_inbody)
-                        st.success("Último registro corporal eliminado.")
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Error al borrar última composición: {e}")
-
-with right:
-    st.markdown("## Evaluación funcional")
+with fila1_col2:
+    st.markdown("### Evaluación funcional")
 
     with st.container(border=True):
         paciente_sexo_guardado = paciente_actual["sexo"] if paciente_actual else None
@@ -2841,19 +2724,142 @@ with right:
                 except Exception as e:
                     st.error(f"Error al guardar: {e}")
 
-st.divider()
-
 # =========================================================
-# MEDICACIÓN
+# FILA 2: COMPOSICIÓN CORPORAL  |  MEDICACIÓN
 # =========================================================
-st.markdown("## Medicación")
+fila2_col1, fila2_col2 = st.columns([1, 1])
 
-m1, m2 = st.columns([1, 1])
+with fila2_col1:
+    st.markdown("### Composición corporal")
 
-with m1:
     with st.container(border=True):
-        st.markdown("### Cargar medicación")
+        if ficha["talla_m"] is None or float(ficha["talla_m"]) <= 0:
+            st.warning("Para cargar composición corporal primero hay que tener una talla válida en el paciente.")
+        else:
+            sexo_corporal = str(ficha["sexo"]).strip().lower()
 
+            col_c1, col_c2 = st.columns(2)
+
+            with col_c1:
+                fecha_inbody = st.date_input("Fecha estudio", value=date.today(), key=f"inbody_fecha_{paciente_id}")
+                peso_inbody = st.number_input("Peso (kg)", min_value=0.0, max_value=300.0, step=0.1, key=f"inbody_peso_{paciente_id}")
+                imc_inbody_calc = round(float(peso_inbody) / (float(ficha["talla_m"]) ** 2), 2) if peso_inbody and ficha["talla_m"] else 0.0
+                st.markdown(f"**IMC calculado:** {imc_inbody_calc:.2f}")
+                grasa_pct = st.number_input("% grasa corporal", min_value=0.0, max_value=80.0, step=0.1, key=f"inbody_grasa_{paciente_id}")
+
+            with col_c2:
+                masa_muscular = st.number_input("Masa muscular (kg)", min_value=0.0, max_value=100.0, step=0.1, key=f"inbody_musculo_{paciente_id}")
+                agua_pct = st.number_input("% agua corporal", min_value=0.0, max_value=100.0, step=0.1, key=f"inbody_agua_{paciente_id}")
+                grasa_visceral = st.number_input("Grasa visceral", min_value=0.0, max_value=30.0, step=0.1, key=f"inbody_visceral_{paciente_id}")
+                metabolismo = st.number_input("Metabolismo basal", min_value=0.0, max_value=4000.0, step=10.0, key=f"inbody_metabolismo_{paciente_id}")
+
+            observaciones_inbody = st.text_area(
+                "Observaciones",
+                key=f"inbody_obs_{paciente_id}",
+                height=80
+            )
+
+            resultado_corporal = evaluar_perfil_morfofuncional(
+                sexo=sexo_corporal,
+                peso_kg=peso_inbody,
+                talla_m=ficha["talla_m"],
+                grasa_pct=grasa_pct,
+                masa_muscular_kg=masa_muscular,
+                agua_pct=agua_pct,
+                grasa_visceral=grasa_visceral
+            )
+
+            bg_estado, fg_estado = color_estado_corporal(resultado_corporal["estado"])
+
+            st.markdown(
+                f"""
+                <div class="result-card" style="background-color:{bg_estado}; color:{fg_estado};">
+                    Diagnóstico corporal: {resultado_corporal["estado"]}
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+            col_r1, col_r2, col_r3 = st.columns(3)
+            with col_r1:
+                st.write(f"**IMC:** {resultado_corporal['imc'] if resultado_corporal['imc'] is not None else '-'}")
+                st.write(f"**Clasificación IMC:** {resultado_corporal['clasif_imc']}")
+                st.write(f"**% grasa:** {resultado_corporal['clasif_grasa']}")
+
+            with col_r2:
+                st.write(f"**% agua corporal:** {resultado_corporal['clasif_agua']}")
+                st.write(f"**Grasa visceral:** {resultado_corporal['clasif_visceral']}")
+                st.write(f"**Músculo relativo %:** {resultado_corporal['musculo_rel_pct'] if resultado_corporal['musculo_rel_pct'] is not None else '-'}")
+
+            with col_r3:
+                st.write(f"**Clasificación muscular:** {resultado_corporal['clasif_musculo']}")
+                st.write(f"**Metabolismo basal:** {metabolismo if metabolismo is not None else '-'}")
+                st.write(f"**Sexo de referencia:** {sexo_corporal.capitalize() if sexo_corporal else '-'}")
+
+            motivos_texto = resultado_corporal["motivos"] if resultado_corporal["motivos"] else ["Sin hallazgos relevantes"]
+            motivos_html = "".join([f"<li>{m}</li>" for m in motivos_texto])
+
+            st.markdown(
+                f"""
+                <div class="motivo-box">
+                    <b>Motivos:</b>
+                    <ul style="margin-top:8px; margin-bottom:0;">
+                        {motivos_html}
+                    </ul>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+            st.markdown(
+                f"""
+                <div class="reco-box">
+                    <b>Sugerencia:</b><br>
+                    {resultado_corporal["recomendacion"]}
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+            bc1, bc2 = st.columns(2)
+
+            with bc1:
+                if st.button("Guardar composición corporal", key=f"guardar_inbody_{paciente_id}"):
+                    try:
+                        guardar_inbody(
+                            paciente_id=paciente_id,
+                            fecha_estudio=fecha_inbody,
+                            peso_kg=peso_inbody,
+                            talla_m=ficha["talla_m"],
+                            grasa_corporal_pct=grasa_pct,
+                            masa_muscular_kg=masa_muscular,
+                            agua_corporal_pct=agua_pct,
+                            grasa_visceral=grasa_visceral,
+                            metabolismo_basal=metabolismo,
+                            observaciones=observaciones_inbody
+                        )
+                        st.success("Composición corporal guardada correctamente")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Error al guardar composición corporal: {e}")
+
+            with bc2:
+                if st.button(
+                    "Borrar última composición",
+                    key=f"btn_borrar_ultimo_inbody_{paciente_id}",
+                    disabled=ultimo_id_inbody is None
+                ):
+                    try:
+                        eliminar_registro_corporal(ultimo_id_inbody)
+                        st.success("Último registro corporal eliminado.")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Error al borrar última composición: {e}")
+
+with fila2_col2:
+    st.markdown("### Medicación")
+
+    with st.container(border=True):
         fecha_cambio = st.date_input(
             "Fecha de cambio",
             value=date.today(),
@@ -2919,9 +2925,7 @@ with m1:
             except Exception as e:
                 st.error(f"Error al guardar medicación: {e}")
 
-with m2:
-    with st.container(border=True):
-        st.markdown("### Historial de medicación")
+        st.markdown("#### Historial de medicación")
 
         df_medicacion = df_medicacion_export.copy()
 
@@ -2947,7 +2951,7 @@ with m2:
                 df_medicacion[columnas_medicacion],
                 use_container_width=True,
                 hide_index=True,
-                height=260
+                height=220
             )
         else:
             st.info("Sin historial de medicación.")
