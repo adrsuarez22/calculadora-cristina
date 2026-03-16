@@ -2648,11 +2648,12 @@ if not df_peso.empty:
             alt.Chart(df_peso_long)
             .mark_line(point=True)
             .encode(
-                x=alt.X("fecha_str:O", title="Fecha"),
+                x=alt.X("fecha_str:O", title="Fecha", axis=alt.Axis(labelFontSize=12, titleFontSize=14)),
                 y=alt.Y(
                     "valor:Q",
                     title="Valor",
-                    scale=alt.Scale(domain=[0, valor_max], nice=False, zero=True)
+                    scale=alt.Scale(domain=[0, valor_max], nice=False, zero=True),
+                    axis=alt.Axis(labelFontSize=12, titleFontSize=14)
                 ),
                 color=alt.Color("variable:N", title="Serie"),
                 tooltip=[
@@ -2661,11 +2662,11 @@ if not df_peso.empty:
                     alt.Tooltip("valor:Q", title="Valor", format=".2f")
                 ]
             )
-            .properties(height=280)
+            .properties(height=350, width=700)
         )
 
-        col1, col2, col3 = st.columns([1,3,1])
-        with col2:
+        col_g1, col_g2, col_g3 = st.columns([1,6,1])
+        with col_g2:
             st.altair_chart(grafico_doble, use_container_width=False)
     else:
         st.info("Sin datos válidos de peso / IMC.")
@@ -2984,11 +2985,8 @@ if not df_historial.empty:
                 text="Etiqueta:N"
             )
 
-            grafico = (linea_p50 + linea + puntos + etiquetas).properties(height=280, width=700)
-
-            col1, col2, col3 = st.columns([1,3,1])
-            with col2:
-                st.altair_chart(grafico, use_container_width=False)
+            grafico = (linea_p50 + linea + puntos + etiquetas).properties(height=280)
+            st.altair_chart(grafico, use_container_width=True)
         else:
             st.info("Sin datos funcionales para esa prueba.")
     else:
