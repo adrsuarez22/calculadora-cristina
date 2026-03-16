@@ -181,6 +181,135 @@ SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # =========================================================
+# SESSION STATE / ESTADO UI
+# =========================================================
+if "mostrar_form_nuevo_paciente" not in st.session_state:
+    st.session_state["mostrar_form_nuevo_paciente"] = False
+
+if "paciente_id_seleccionado" not in st.session_state:
+    st.session_state["paciente_id_seleccionado"] = None
+
+if "paciente_cargado_id" not in st.session_state:
+    st.session_state["paciente_cargado_id"] = None
+
+if "busqueda_paciente" not in st.session_state:
+    st.session_state["busqueda_paciente"] = ""
+
+
+def calcular_edad_desde_fecha(fecha_nacimiento):
+    if not fecha_nacimiento:
+        return 0
+
+    try:
+        fecha_dt = pd.to_datetime(fecha_nacimiento, errors="coerce")
+        if pd.isna(fecha_dt):
+            return 0
+
+        fecha_nac = fecha_dt.date()
+        hoy = date.today()
+
+        return (
+            hoy.year
+            - fecha_nac.year
+            - ((hoy.month, hoy.day) < (fecha_nac.month, fecha_nac.day))
+        )
+    except Exception:
+        return 0
+
+
+def obtener_ultimo_peso_historial(df_peso):
+    if df_peso is None or df_peso.empty:
+        return 0.0
+
+    df_tmp = df_peso.copy()
+
+    if "fecha" in df_tmp.columns:
+        df_tmp["fecha"] = pd.to_datetime(df_tmp["fecha"], errors="coerce")
+
+    if "created_at" in df_tmp.columns:
+        df_tmp["created_at"] = pd.to_datetime(df_tmp["created_at"], errors="coerce")
+
+    columnas_sort = []
+    ascending_sort = []
+
+    if "fecha" in df_tmp.columns:
+        columnas_sort.append("fecha")
+        ascending_sort.append(False)
+
+    if "created_at" in df_tmp.columns:
+        columnas_sort.append("created_at")
+        ascending_sort.append(False)
+
+    if "id" in df_tmp.columns:
+        columnas_sort.append("id")
+        ascending_sort.append(False)
+
+    if columnas_sort:
+        df_tmp = df_tmp.sort_values(columnas_sort, ascending=ascending_sort)
+
+    if "peso_kg" not in df_tmp.columns or df_tmp.empty:
+        return 0.0
+
+    peso = pd.to_numeric(df_tmp.iloc[0].get("peso_kg"), errors="coerce")
+
+    if pd.isna(peso):
+        return 0.0
+
+    return float(peso)
+
+
+def resetear_form_nuevo_paciente():
+    st.session_state["nuevo_nombre_alta"] = ""
+    st.session_state["nuevo_sexo_alta"] = "hombre"
+    st.session_state["nueva_fecha_nacimiento_alta"] = date(1970, 1, 1)
+    st.session_state["nueva_talla_alta"] = 1.70
+
+
+def resetear_pruebas_funcionales():
+    st.session_state["selector_prueba"] = "Caminata 6 minutos"
+    st.session_state["selector_sexo"] = "Hombre"
+
+    st.session_state["edad_caminata"] = 40
+    st.session_state["altura_caminata"] = 170
+    st.session_state["valor_caminata"] = 0.0
+
+    st.session_state["edad_prension"] = 20
+    st.session_state["valor_prension"] = 0.0
+
+    st.session_state["edad_silla"] = 65
+    st.session_state["valor_silla"] = 0.0
+
+
+def cargar_datos_paciente_en_widgets(paciente_actual, df_peso):
+    if paciente_actual is None:
+        return
+
+    paciente_id = paciente_actual.get("id")
+    sexo = str(paciente_actual.get("sexo", "")).strip().lower()
+    talla_m = paciente_actual.get("talla_m")
+    edad_real = calcular_edad_desde_fecha(paciente_actual.get("fecha_nacimiento"))
+    peso_actual = obtener_ultimo_peso_historial(df_peso)
+
+    resetear_pruebas_funcionales()
+
+    st.session_state["selector_sexo"] = "Mujer" if sexo == "mujer" else "Hombre"
+    st.session_state["edad_caminata"] = min(max(edad_real, 40), 80)
+    st.session_state["edad_prension"] = min(max(edad_real, 20), 100)
+    st.session_state["edad_silla"] = min(max(edad_real, 65), 100)
+
+    altura_caminata = 170
+    if talla_m is not None:
+        try:
+            altura_cm = int(round(float(talla_m) * 100))
+            altura_caminata = min([150, 160, 170, 180, 190], key=lambda x: abs(x - altura_cm))
+        except Exception:
+            altura_caminata = 170
+
+    st.session_state["altura_caminata"] = altura_caminata
+    st.session_state[f"peso_kg_{paciente_id}"] = float(peso_actual)
+    st.session_state[f"inbody_peso_{paciente_id}"] = float(peso_actual)
+    st.session_state["paciente_cargado_id"] = paciente_id
+# =========================================================
 # LECTURAS CACHEADAS
 # =========================================================
 @st.cache_data(ttl=300)
