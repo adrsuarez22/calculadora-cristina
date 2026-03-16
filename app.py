@@ -1782,7 +1782,7 @@ def generar_pdf_paciente(ficha, df_peso, df_inbody, df_eval, df_medicacion):
 
     story = []
 
-    story.append(Paragraph("Reporte completo del paciente", styles["TituloMain"]))
+    story.append(Paragraph("Informe Método Dra. Petratti", styles["TituloMain"]))
     story.append(Paragraph(f"<b>Paciente:</b> {_texto_seguro(ficha['nombre'])}", styles["Caja"]))
     story.append(Paragraph(f"<b>Sexo:</b> {_texto_seguro(ficha['sexo'])}", styles["Caja"]))
     story.append(Paragraph(f"<b>Talla:</b> {_texto_seguro(ficha['talla_m'])} m", styles["Caja"]))
