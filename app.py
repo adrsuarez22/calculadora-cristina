@@ -2232,7 +2232,7 @@ if not pacientes:
     st.warning("No hay pacientes cargados.")
     st.stop()
 
-st.title("Calculadora de Condición Física")
+st.title("Método Dra. Petratti")
 
 col_alta_btn_1, col_alta_btn_2 = st.columns([1, 5])
 
