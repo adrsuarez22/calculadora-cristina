@@ -131,7 +131,7 @@ def preparar_dataset_longitudinal(df_estadistico):
 # CONFIG
 # =========================================================
 st.set_page_config(
-    page_title="Calculadora de Condición Física",
+    page_title="Método Dra. Petratti",
     page_icon="💪",
     layout="wide"
 )
@@ -2415,7 +2415,8 @@ if not pacientes:
     st.warning("No hay pacientes cargados.")
     st.stop()
 
-st.title("Calculadora de Condición Física")
+st.title("Método Dra. Petratti")
+st.caption("Evaluación clínica de condición física y riesgo cardiometabólico")
 
 col_alta_btn_1, col_alta_btn_2 = st.columns([1, 5])
 
