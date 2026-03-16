@@ -2005,6 +2005,217 @@ def calcular_resultado(prueba, sexo, edad, altura, valor_medido):
     return None, "Sin clasificar", "-", "-", "-"
 
 
+
+
+def obtener_ultimo_registro(df, columna_fecha="fecha"):
+    if df is None or df.empty:
+        return None
+
+    df_tmp = df.copy()
+
+    if columna_fecha in df_tmp.columns:
+        df_tmp[columna_fecha] = pd.to_datetime(df_tmp[columna_fecha], errors="coerce")
+
+    columnas_sort = []
+    ascending_sort = []
+
+    if columna_fecha in df_tmp.columns:
+        columnas_sort.append(columna_fecha)
+        ascending_sort.append(False)
+
+    if "created_at" in df_tmp.columns:
+        df_tmp["created_at"] = pd.to_datetime(df_tmp["created_at"], errors="coerce")
+        columnas_sort.append("created_at")
+        ascending_sort.append(False)
+
+    if "id" in df_tmp.columns:
+        columnas_sort.append("id")
+        ascending_sort.append(False)
+
+    if columnas_sort:
+        df_tmp = df_tmp.sort_values(columnas_sort, ascending=ascending_sort)
+
+    if df_tmp.empty:
+        return None
+
+    return df_tmp.iloc[0]
+
+
+def color_estado_global_informe(estado):
+    mapa = {
+        "Perfil conservado": ("#2e7d32", "#ffffff"),
+        "Riesgo funcional leve": ("#f9a825", "#1f1f1f"),
+        "Riesgo funcional moderado": ("#ef6c00", "#ffffff"),
+        "Riesgo funcional alto": ("#c62828", "#ffffff"),
+        "Riesgo cardiometabólico": ("#ad1457", "#ffffff"),
+        "Riesgo combinado": ("#6a1b9a", "#ffffff"),
+        "Sin datos suficientes": ("#757575", "#ffffff")
+    }
+    return mapa.get(estado, ("#757575", "#ffffff"))
+
+
+def generar_informe_integrado_paciente(ficha, df_peso, df_inbody, df_eval, df_medicacion):
+    filas_resumen = []
+
+    nombre = ficha.get("nombre", "-")
+    sexo = str(ficha.get("sexo", "")).strip().lower()
+    talla_m = ficha.get("talla_m")
+
+    ultimo_peso = obtener_ultimo_registro(df_peso, "fecha")
+    ultimo_inbody = None
+    if df_inbody is not None and not df_inbody.empty and talla_m is not None:
+        df_inbody_enriquecido = enriquecer_historial_corporal(df_inbody, sexo, talla_m)
+        ultimo_inbody = obtener_ultimo_registro(df_inbody_enriquecido, "fecha")
+    else:
+        df_inbody_enriquecido = pd.DataFrame()
+
+    df_eval_tmp = df_eval.copy() if df_eval is not None else pd.DataFrame()
+    if not df_eval_tmp.empty and "fecha" in df_eval_tmp.columns:
+        df_eval_tmp["fecha"] = pd.to_datetime(df_eval_tmp["fecha"], errors="coerce")
+        df_eval_tmp = df_eval_tmp.sort_values(["prueba", "fecha"], ascending=[True, False])
+
+    ultimos_funcionales = {}
+    if not df_eval_tmp.empty:
+        for prueba in ["Caminata 6 minutos", "Prensión manual", "Levantarse de la silla"]:
+            df_prueba = df_eval_tmp[df_eval_tmp["prueba"].astype(str).str.strip() == prueba].copy()
+            if not df_prueba.empty:
+                ultimos_funcionales[prueba] = df_prueba.iloc[0]
+
+    if ultimo_peso is not None:
+        filas_resumen.append({
+            "Área": "Corporal",
+            "Variable": "IMC",
+            "Valor": round(float(ultimo_peso.get("imc")), 2) if pd.notna(ultimo_peso.get("imc")) else "-",
+            "Percentil": "-",
+            "Clasificación": clasificar_imc(float(ultimo_peso.get("imc")))[0] if pd.notna(ultimo_peso.get("imc")) else "-"
+        })
+
+    if ultimo_inbody is not None:
+        filas_resumen.append({
+            "Área": "Corporal",
+            "Variable": "Grasa corporal",
+            "Valor": f"{round(float(ultimo_inbody.get('grasa_corporal_pct')), 1)} %" if pd.notna(ultimo_inbody.get("grasa_corporal_pct")) else "-",
+            "Percentil": "-",
+            "Clasificación": str(ultimo_inbody.get("clasif_grasa", "-"))
+        })
+        filas_resumen.append({
+            "Área": "Corporal",
+            "Variable": "Músculo relativo",
+            "Valor": f"{round(float(ultimo_inbody.get('musculo_rel_pct')), 1)} %" if pd.notna(ultimo_inbody.get("musculo_rel_pct")) else "-",
+            "Percentil": "-",
+            "Clasificación": str(ultimo_inbody.get("clasif_musculo", "-"))
+        })
+        filas_resumen.append({
+            "Área": "Corporal",
+            "Variable": "Grasa visceral",
+            "Valor": round(float(ultimo_inbody.get("grasa_visceral")), 1) if pd.notna(ultimo_inbody.get("grasa_visceral")) else "-",
+            "Percentil": "-",
+            "Clasificación": str(ultimo_inbody.get("clasif_visceral", "-"))
+        })
+
+    for prueba, etiqueta_valor in {
+        "Caminata 6 minutos": "m",
+        "Prensión manual": "kg",
+        "Levantarse de la silla": "rep"
+    }.items():
+        row = ultimos_funcionales.get(prueba)
+        if row is not None:
+            valor = row.get("valor_medido")
+            percentil = row.get("percentil")
+            clasificacion = row.get("clasificacion", "-")
+
+            valor_fmt = "-"
+            if pd.notna(valor):
+                if etiqueta_valor == "rep":
+                    valor_fmt = f"{int(round(float(valor)))} {etiqueta_valor}"
+                else:
+                    valor_fmt = f"{round(float(valor), 1)} {etiqueta_valor}"
+
+            filas_resumen.append({
+                "Área": "Funcional",
+                "Variable": prueba,
+                "Valor": valor_fmt,
+                "Percentil": f"P{round(float(percentil), 1)}" if pd.notna(percentil) else "-",
+                "Clasificación": str(clasificacion)
+            })
+
+    df_resumen = pd.DataFrame(filas_resumen)
+
+    percentiles_validos = []
+    clasificaciones_funcionales = []
+
+    for row in ultimos_funcionales.values():
+        if pd.notna(row.get("percentil")):
+            percentiles_validos.append(float(row.get("percentil")))
+        if pd.notna(row.get("clasificacion")):
+            clasificaciones_funcionales.append(str(row.get("clasificacion")))
+
+    peor_percentil = min(percentiles_validos) if percentiles_validos else None
+    promedio_percentil = round(sum(percentiles_validos) / len(percentiles_validos), 1) if percentiles_validos else None
+
+    cant_muy_bajo = sum(1 for x in percentiles_validos if x < 10)
+    cant_bajo = sum(1 for x in percentiles_validos if 10 <= x < 25)
+
+    estado_corporal = str(ultimo_inbody.get("diagnostico_corporal")) if ultimo_inbody is not None and pd.notna(ultimo_inbody.get("diagnostico_corporal")) else "Sin datos"
+    recomendacion_corporal = str(ultimo_inbody.get("sugerencia_corporal")) if ultimo_inbody is not None and pd.notna(ultimo_inbody.get("sugerencia_corporal")) else ""
+
+    if not filas_resumen:
+        estado_global = "Sin datos suficientes"
+    elif estado_corporal in ["Riesgo cardiometabólico", "Riesgo cardiometabólico moderado"] and (cant_muy_bajo >= 1 or cant_bajo >= 2):
+        estado_global = "Riesgo combinado"
+    elif estado_corporal in ["Riesgo cardiometabólico", "Riesgo cardiometabólico moderado", "Obesidad"]:
+        estado_global = "Riesgo cardiometabólico"
+    elif cant_muy_bajo >= 2 or (cant_muy_bajo >= 1 and cant_bajo >= 1):
+        estado_global = "Riesgo funcional alto"
+    elif cant_muy_bajo >= 1 or cant_bajo >= 2:
+        estado_global = "Riesgo funcional moderado"
+    elif cant_bajo == 1 or estado_corporal in ["Sobrepeso", "Riesgo sarcopénico", "Bajo peso"]:
+        estado_global = "Riesgo funcional leve"
+    else:
+        estado_global = "Perfil conservado"
+
+    partes_comentario = [f"Paciente {nombre}."]
+    if promedio_percentil is not None:
+        partes_comentario.append(f"Promedio funcional reciente: P{promedio_percentil}.")
+    if peor_percentil is not None:
+        partes_comentario.append(f"Peor desempeño funcional: P{round(peor_percentil, 1)}.")
+    if estado_corporal != "Sin datos":
+        partes_comentario.append(f"Estado corporal actual: {estado_corporal}.")
+    if cant_muy_bajo >= 1:
+        partes_comentario.append("Hay al menos una prueba funcional en rango muy bajo.")
+    elif cant_bajo >= 1:
+        partes_comentario.append("Hay pruebas funcionales por debajo del rango esperado.")
+    else:
+        if percentiles_validos:
+            partes_comentario.append("Las pruebas funcionales recientes no muestran descensos relevantes.")
+    comentario_unificado = " ".join(partes_comentario).strip()
+
+    recomendaciones = []
+    if estado_global in ["Riesgo funcional alto", "Riesgo funcional moderado", "Riesgo combinado"]:
+        recomendaciones.append("Priorizar entrenamiento de fuerza y capacidad funcional.")
+    if estado_global in ["Riesgo cardiometabólico", "Riesgo combinado"] or estado_corporal in ["Obesidad", "Sobrepeso", "Riesgo cardiometabólico", "Riesgo cardiometabólico moderado"]:
+        recomendaciones.append("Controlar composición corporal y riesgo cardiometabólico.")
+    if peor_percentil is not None:
+        if peor_percentil < 10:
+            recomendaciones.append("Repetir evaluación funcional en 30 días.")
+        elif peor_percentil < 25:
+            recomendaciones.append("Repetir evaluación funcional en 45-60 días.")
+    if recomendacion_corporal:
+        recomendaciones.append(recomendacion_corporal)
+
+    recomendaciones = list(dict.fromkeys([r for r in recomendaciones if r]))
+    recomendacion_final = " ".join(recomendaciones) if recomendaciones else "Mantener seguimiento periódico y repetir controles según evolución."
+
+    return {
+        "estado_global": estado_global,
+        "estado_corporal": estado_corporal,
+        "peor_percentil": peor_percentil,
+        "promedio_percentil": promedio_percentil,
+        "comentario_unificado": comentario_unificado,
+        "recomendacion_final": recomendacion_final,
+        "tabla_resumen": df_resumen
+    }
+
 # =========================================================
 # UI
 # =========================================================
@@ -2298,6 +2509,92 @@ with k4:
         st.write(f"**Fecha:** {ficha['ultima_fecha']}")
         st.write(f"**Prueba:** {ficha['ultima_prueba']}")
         st.write(f"**Clasificación:** {ficha['ultima_clasificacion']}")
+
+st.divider()
+
+
+# =========================================================
+# INFORME INTEGRADO
+# =========================================================
+informe_integrado = generar_informe_integrado_paciente(
+    ficha=ficha,
+    df_peso=df_peso_export,
+    df_inbody=df_inbody_export,
+    df_eval=df_eval_export,
+    df_medicacion=df_medicacion_export
+)
+
+st.markdown("## Informe integrado del paciente")
+
+bg_estado_global, fg_estado_global = color_estado_global_informe(informe_integrado["estado_global"])
+
+st.markdown(
+    f"""
+    <div class="result-card" style="background-color:{bg_estado_global}; color:{fg_estado_global};">
+        Estado global: {informe_integrado["estado_global"]}
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
+ii1, ii2, ii3 = st.columns(3)
+
+with ii1:
+    with st.container(border=True):
+        st.markdown("#### Funcional")
+        if informe_integrado["promedio_percentil"] is not None:
+            st.write(f"**Promedio percentilar:** P{informe_integrado['promedio_percentil']}")
+        else:
+            st.write("**Promedio percentilar:** -")
+
+        if informe_integrado["peor_percentil"] is not None:
+            st.write(f"**Peor percentil:** P{round(informe_integrado['peor_percentil'], 1)}")
+        else:
+            st.write("**Peor percentil:** -")
+
+with ii2:
+    with st.container(border=True):
+        st.markdown("#### Corporal")
+        st.write(f"**Estado corporal:** {informe_integrado['estado_corporal']}")
+        st.write(f"**Paciente:** {ficha['nombre']}")
+        st.write(f"**Sexo / talla:** {str(ficha['sexo']).capitalize() if ficha['sexo'] else '-'} / {ficha['talla_m'] if ficha['talla_m'] is not None else '-'}")
+
+with ii3:
+    with st.container(border=True):
+        st.markdown("#### Conclusión")
+        st.write(f"**Estado integrado:** {informe_integrado['estado_global']}")
+        st.write(f"**Última prueba:** {ficha['ultima_prueba']}")
+        st.write(f"**Última clasificación:** {ficha['ultima_clasificacion']}")
+
+df_tabla_resumen = informe_integrado["tabla_resumen"]
+
+if df_tabla_resumen is not None and not df_tabla_resumen.empty:
+    st.markdown("### Resumen unificado de percentiles y clasificaciones")
+    st.dataframe(
+        df_tabla_resumen,
+        use_container_width=True,
+        hide_index=True
+    )
+
+st.markdown(
+    f"""
+    <div class="motivo-box">
+        <b>Comentario clínico unificado:</b><br><br>
+        {informe_integrado["comentario_unificado"]}
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
+st.markdown(
+    f"""
+    <div class="reco-box">
+        <b>Recomendación unificada:</b><br>
+        {informe_integrado["recomendacion_final"]}
+    </div>
+    """,
+    unsafe_allow_html=True
+)
 
 st.divider()
 
