@@ -267,16 +267,8 @@ def resetear_form_nuevo_paciente():
 
 def resetear_pruebas_funcionales():
     st.session_state["selector_prueba"] = "Caminata 6 minutos"
-    st.session_state["selector_sexo"] = "Hombre"
-
-    st.session_state["edad_caminata"] = 40
-    st.session_state["altura_caminata"] = 170
     st.session_state["valor_caminata"] = 0.0
-
-    st.session_state["edad_prension"] = 20
     st.session_state["valor_prension"] = 0.0
-
-    st.session_state["edad_silla"] = 65
     st.session_state["valor_silla"] = 0.0
 
 
@@ -285,27 +277,10 @@ def cargar_datos_paciente_en_widgets(paciente_actual, df_peso):
         return
 
     paciente_id = paciente_actual.get("id")
-    sexo = str(paciente_actual.get("sexo", "")).strip().lower()
-    talla_m = paciente_actual.get("talla_m")
-    edad_real = calcular_edad_desde_fecha(paciente_actual.get("fecha_nacimiento"))
     peso_actual = obtener_ultimo_peso_historial(df_peso)
 
     resetear_pruebas_funcionales()
 
-    st.session_state["selector_sexo"] = "Mujer" if sexo == "mujer" else "Hombre"
-    st.session_state["edad_caminata"] = min(max(edad_real, 40), 80)
-    st.session_state["edad_prension"] = min(max(edad_real, 20), 100)
-    st.session_state["edad_silla"] = min(max(edad_real, 65), 100)
-
-    altura_caminata = 170
-    if talla_m is not None:
-        try:
-            altura_cm = int(round(float(talla_m) * 100))
-            altura_caminata = min([150, 160, 170, 180, 190], key=lambda x: abs(x - altura_cm))
-        except Exception:
-            altura_caminata = 170
-
-    st.session_state["altura_caminata"] = altura_caminata
     st.session_state[f"peso_kg_{paciente_id}"] = float(peso_actual)
     st.session_state[f"inbody_peso_{paciente_id}"] = float(peso_actual)
     st.session_state["paciente_cargado_id"] = paciente_id
@@ -1930,15 +1905,45 @@ def grupo_edad_silla(edad):
     return None
 
 
+def obtener_altura_referencia_caminata(talla_m):
+    if talla_m is None:
+        return None
+    try:
+        altura_cm = int(round(float(talla_m) * 100))
+    except Exception:
+        return None
+
+    alturas_validas = sorted(TABLA_CAMINATA_6M.keys())
+    if altura_cm < min(alturas_validas) or altura_cm > max(alturas_validas):
+        return None
+
+    return min(alturas_validas, key=lambda x: abs(x - altura_cm))
+
+
 def calcular_resultado(prueba, sexo, edad, altura, valor_medido):
     sexo = str(sexo).strip()
     edad = int(edad)
     valor_medido = float(valor_medido)
 
+    if valor_medido <= 0:
+        return None, "Sin clasificar", "-", "-", "-"
+
     if prueba == "Caminata 6 minutos":
+        alturas_validas = sorted(TABLA_CAMINATA_6M.keys())
+        edades_validas = sorted(next(iter(TABLA_CAMINATA_6M.values())).keys())
+
+        if altura is None:
+            return None, "Sin clasificar", "-", "-", "Altura fuera del rango validado por la tabla"
+
         altura = int(altura)
-        altura_ref = min(TABLA_CAMINATA_6M.keys(), key=lambda x: abs(x - altura))
-        edad_ref = min(TABLA_CAMINATA_6M[altura_ref].keys(), key=lambda x: abs(x - edad))
+        if altura < min(alturas_validas) or altura > max(alturas_validas):
+            return None, "Sin clasificar", "-", "-", "Altura fuera del rango validado por la tabla"
+
+        if edad < min(edades_validas) or edad > max(edades_validas):
+            return None, "Sin clasificar", "-", "-", "Edad fuera del rango validado por la tabla"
+
+        altura_ref = min(alturas_validas, key=lambda x: abs(x - altura))
+        edad_ref = min(edades_validas, key=lambda x: abs(x - edad))
 
         percentiles = TABLA_CAMINATA_6M[altura_ref][edad_ref]
         percentil_estimado = interpolar_percentil(valor_medido, percentiles)
@@ -1959,6 +1964,9 @@ def calcular_resultado(prueba, sexo, edad, altura, valor_medido):
         )
 
     if prueba == "Prensión manual":
+        if edad < 20 or edad > 100:
+            return None, "Sin clasificar", "-", "-", "Edad fuera del rango validado por la tabla"
+
         grupo = grupo_edad_prension(edad)
         percentiles = TABLA_PRENSION[sexo][grupo]
         percentil_estimado = interpolar_percentil(valor_medido, percentiles)
@@ -1982,7 +1990,7 @@ def calcular_resultado(prueba, sexo, edad, altura, valor_medido):
         grupo = grupo_edad_silla(edad)
 
         if grupo is None:
-            return None, "Sin clasificar", "-", "-", "Edad fuera del rango de la tabla (65+ años)"
+            return None, "Sin clasificar", "-", "-", "Esta prueba percentilar está validada solo para pacientes de 65 años o más"
 
         percentiles = TABLA_SILLA[sexo][grupo]
         percentil_estimado = interpolar_percentil(valor_medido, percentiles)
@@ -2003,7 +2011,6 @@ def calcular_resultado(prueba, sexo, edad, altura, valor_medido):
         )
 
     return None, "Sin clasificar", "-", "-", "-"
-
 
 
 
@@ -2667,7 +2674,11 @@ st.divider()
 st.markdown("### Evaluación funcional")
 
 with st.container(border=True):
-    paciente_sexo_guardado = paciente_actual["sexo"] if paciente_actual else None
+    sexo_paciente = str(paciente_actual.get("sexo", "")).strip().lower() if paciente_actual else ""
+    sexo = "Mujer" if sexo_paciente == "mujer" else "Hombre"
+    edad_real = calcular_edad_desde_fecha(paciente_actual.get("fecha_nacimiento")) if paciente_actual else 0
+    talla_m_paciente = paciente_actual.get("talla_m") if paciente_actual else None
+    altura_ref_caminata = obtener_altura_referencia_caminata(talla_m_paciente)
 
     prueba = st.selectbox(
         "Seleccionar prueba",
@@ -2675,28 +2686,25 @@ with st.container(border=True):
         key="selector_prueba"
     )
 
-    sexo_default = "Hombre"
-    if paciente_sexo_guardado == "mujer":
-        sexo_default = "Mujer"
-    elif paciente_sexo_guardado == "hombre":
-        sexo_default = "Hombre"
+    st.write(f"**Sexo del paciente:** {sexo}")
+    st.write(f"**Edad del paciente:** {edad_real} años")
+    if talla_m_paciente is not None:
+        st.write(f"**Talla del paciente:** {float(talla_m_paciente):.2f} m")
+    else:
+        st.write("**Talla del paciente:** -")
 
-    sexo = st.selectbox(
-        "Sexo",
-        ["Hombre", "Mujer"],
-        index=0 if sexo_default == "Hombre" else 1,
-        key="selector_sexo"
-    )
-
+    valor_medido = 0.0
     altura = None
-    valor_medido = None
 
     if prueba == "Caminata 6 minutos":
-        col_f1, col_f2 = st.columns(2)
-        with col_f1:
-            edad = st.selectbox("Edad", list(range(40, 81)), index=20, key="edad_caminata")
-        with col_f2:
-            altura = st.selectbox("Altura (cm)", [150, 160, 170, 180, 190], index=2, key="altura_caminata")
+        altura = altura_ref_caminata
+        st.write(f"**Altura de referencia aplicada:** {altura_ref_caminata if altura_ref_caminata is not None else '-'} cm")
+        if 40 <= edad_real <= 80:
+            edad_ref_preview = min([40, 50, 60, 70, 80], key=lambda x: abs(x - edad_real))
+            st.write(f"**Edad de referencia aplicada:** {edad_ref_preview} años")
+        else:
+            st.write("**Edad de referencia aplicada:** fuera del rango validado")
+
         valor_medido = st.number_input(
             "Distancia caminada (metros)",
             min_value=0.0,
@@ -2707,7 +2715,11 @@ with st.container(border=True):
         )
 
     elif prueba == "Prensión manual":
-        edad = st.selectbox("Edad", list(range(20, 101)), index=45, key="edad_prension")
+        if 20 <= edad_real <= 100:
+            st.write(f"**Grupo etario aplicado:** {grupo_edad_prension(edad_real)}")
+        else:
+            st.write("**Grupo etario aplicado:** fuera del rango validado")
+
         valor_medido = st.number_input(
             "Fuerza de prensión (kg)",
             min_value=0.0,
@@ -2718,7 +2730,9 @@ with st.container(border=True):
         )
 
     elif prueba == "Levantarse de la silla":
-        edad = st.selectbox("Edad", list(range(65, 101)), index=10, key="edad_silla")
+        grupo_preview = grupo_edad_silla(edad_real)
+        st.write(f"**Grupo etario aplicado:** {grupo_preview if grupo_preview is not None else 'No validado (< 65 años)'}")
+
         valor_medido = st.number_input(
             "Cantidad de repeticiones",
             min_value=0.0,
@@ -2731,71 +2745,76 @@ with st.container(border=True):
     percentil, clasificacion, referencia_p50, referencia_altura, referencia_edad = calcular_resultado(
         prueba=prueba,
         sexo=sexo,
-        edad=edad,
+        edad=edad_real,
         altura=altura,
         valor_medido=valor_medido
     )
 
-    color = color_clasificacion(clasificacion)
+    if valor_medido > 0:
+        color = color_clasificacion(clasificacion)
 
-    st.markdown(
-        f"""
-        <div style="
-            background-color:{color};
-            color:white;
-            padding:10px 12px;
-            border-radius:8px;
-            text-align:center;
-            font-size:18px;
-            font-weight:600;
-            margin-top:18px;
-            margin-bottom:10px;
-        ">
-            {clasificacion}
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+        st.markdown(
+            f"""
+            <div style="
+                background-color:{color};
+                color:white;
+                padding:10px 12px;
+                border-radius:8px;
+                text-align:center;
+                font-size:18px;
+                font-weight:600;
+                margin-top:18px;
+                margin-bottom:10px;
+            ">
+                {clasificacion}
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
 
-    st.markdown(
-        f"""
-        <div style="
-            background-color:#dff0e6;
-            color:#1b5e20;
-            padding:8px 12px;
-            border-radius:8px;
-            font-size:15px;
-            margin-bottom:14px;
-        ">
-            Percentil estimado: <b>P{percentil if percentil is not None else "-"}</b>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+        st.markdown(
+            f"""
+            <div style="
+                background-color:#dff0e6;
+                color:#1b5e20;
+                padding:8px 12px;
+                border-radius:8px;
+                font-size:15px;
+                margin-bottom:14px;
+            ">
+                Percentil estimado: <b>{f'P{percentil}' if percentil is not None else '-'}</b>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
 
-    st.write(f"**Rango percentilar:** {rango_percentilar(percentil)}")
-    st.write(f"**Referencia P50:** {referencia_p50}")
+        st.write(f"**Rango percentilar:** {rango_percentilar(percentil)}")
+        st.write(f"**Referencia P50:** {referencia_p50}")
 
-    if referencia_altura != "-":
-        st.write(f"**Referencia de altura:** {referencia_altura}")
+        if referencia_altura != "-":
+            st.write(f"**Referencia de altura:** {referencia_altura}")
 
-    if referencia_edad != "-":
-        st.write(f"**Referencia etaria:** {referencia_edad}")
+        if referencia_edad != "-":
+            st.write(f"**Referencia etaria:** {referencia_edad}")
 
-    st.write(f"**Interpretación clínica:** {interpretacion_clinica(clasificacion)}")
+        st.write(f"**Interpretación clínica:** {interpretacion_clinica(clasificacion)}")
+    else:
+        st.info("Ingresá el valor logrado para calcular el percentil y la clasificación.")
 
     if st.button("Guardar evaluación", key="btn_guardar_evaluacion"):
         if not paciente_nombre:
             st.warning("Seleccioná un paciente antes de guardar.")
+        elif valor_medido <= 0:
+            st.warning("Ingresá un valor logrado mayor a 0.")
         elif percentil is None:
-            st.warning("No se pudo calcular el percentil.")
+            st.warning(referencia_edad if referencia_edad not in ["-", None, ""] else "No se pudo calcular el percentil con las tablas validadas.")
         else:
             try:
                 guardar_evaluacion(
                     paciente_id=paciente_id,
                     paciente_nombre=paciente_nombre,
                     sexo=sexo,
-                    edad=edad,
+                    edad=edad_real,
                     prueba=prueba,
                     valor_medido=valor_medido,
                     percentil=percentil,
@@ -2805,7 +2824,6 @@ with st.container(border=True):
                 st.rerun()
             except Exception as e:
                 st.error(f"Error al guardar: {e}")
-
 
 
 st.markdown("#### Historial funcional")
