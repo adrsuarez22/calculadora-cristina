@@ -259,10 +259,7 @@ def obtener_ultimo_peso_historial(df_peso):
 
 
 def resetear_form_nuevo_paciente():
-    st.session_state["nuevo_nombre_alta"] = ""
-    st.session_state["nuevo_sexo_alta"] = "hombre"
-    st.session_state["nueva_fecha_nacimiento_alta"] = date(1970, 1, 1)
-    st.session_state["nueva_talla_alta"] = 1.70
+    return
 
 
 def resetear_pruebas_funcionales():
@@ -2081,7 +2078,6 @@ if st.session_state["mostrar_form_nuevo_paciente"]:
                         st.session_state["paciente_id_seleccionado"] = nuevo_paciente_id
                         st.session_state["paciente_cargado_id"] = None
 
-                        resetear_form_nuevo_paciente()
                         resetear_pruebas_funcionales()
 
                         st.success("Paciente agregado correctamente.")
@@ -2092,7 +2088,6 @@ if st.session_state["mostrar_form_nuevo_paciente"]:
         with col_cancelar_paciente:
             if st.button("Cancelar", key="btn_cancelar_nuevo_paciente"):
                 st.session_state["mostrar_form_nuevo_paciente"] = False
-                resetear_form_nuevo_paciente()
                 st.rerun()
 
 # =========================================================
@@ -2322,7 +2317,6 @@ with left:
                     "Peso (kg)",
                     min_value=0.0,
                     max_value=300.0,
-                    value=70.0,
                     step=0.1,
                     format="%.1f",
                     key=f"peso_kg_{paciente_id}"
@@ -2520,7 +2514,6 @@ with right:
                 "Distancia caminada (metros)",
                 min_value=0.0,
                 max_value=2000.0,
-                value=600.0,
                 step=1.0,
                 format="%.2f",
                 key="valor_caminata"
@@ -2532,7 +2525,6 @@ with right:
                 "Fuerza de prensión (kg)",
                 min_value=0.0,
                 max_value=100.0,
-                value=25.0,
                 step=0.1,
                 format="%.1f",
                 key="valor_prension"
@@ -2544,7 +2536,6 @@ with right:
                 "Cantidad de repeticiones",
                 min_value=0.0,
                 max_value=60.0,
-                value=12.0,
                 step=1.0,
                 format="%.0f",
                 key="valor_silla"
