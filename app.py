@@ -2581,6 +2581,89 @@ with st.container(border=True):
                 except Exception as e:
                     st.error(f"Error al borrar último peso: {e}")
 
+
+
+st.markdown("#### Historial de peso / IMC")
+
+df_peso_hist = df_peso_export.copy()
+
+if not df_peso_hist.empty:
+    df_peso_hist["fecha"] = pd.to_datetime(df_peso_hist["fecha"], errors="coerce")
+    df_peso_hist = df_peso_hist.dropna(subset=["fecha"]).sort_values("fecha", ascending=False)
+
+    st.markdown("**Fecha | Peso | IMC | Eliminar**")
+
+    for _, row in df_peso_hist.iterrows():
+        c1, c2, c3, c4 = st.columns([1.2, 1, 1, 0.5])
+
+        fecha_txt = row["fecha"].strftime("%Y-%m-%d") if pd.notna(row.get("fecha")) else ""
+        peso_txt = f"{float(row['peso_kg']):.1f}" if pd.notna(row.get("peso_kg")) else ""
+        imc_txt = f"{float(row['imc']):.2f}" if pd.notna(row.get("imc")) else ""
+
+        c1.write(fecha_txt)
+        c2.write(peso_txt)
+        c3.write(imc_txt)
+
+        if c4.button("🗑", key=f"del_peso_{row['id']}"):
+            try:
+                eliminar_registro_peso(row["id"])
+                st.success("Registro de peso eliminado.")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Error al eliminar registro de peso: {e}")
+else:
+    st.info("Sin historial de peso / IMC.")
+
+st.markdown("#### Evolución de peso e IMC")
+
+df_peso = df_peso_export.copy()
+
+if not df_peso.empty:
+    df_peso["fecha"] = pd.to_datetime(df_peso["fecha"], errors="coerce")
+    df_peso["peso_kg"] = pd.to_numeric(df_peso["peso_kg"], errors="coerce")
+    df_peso["imc"] = pd.to_numeric(df_peso["imc"], errors="coerce")
+    df_peso = df_peso.dropna(subset=["fecha", "peso_kg", "imc"]).sort_values("fecha", ascending=True)
+
+    if not df_peso.empty:
+        df_peso["fecha_str"] = df_peso["fecha"].dt.strftime("%Y-%m-%d")
+
+        valor_max = max(df_peso["peso_kg"].max(), df_peso["imc"].max())
+        valor_max = max(10, round(valor_max * 1.10, 1))
+
+        df_peso_long = df_peso.melt(
+            id_vars=["fecha_str"],
+            value_vars=["peso_kg", "imc"],
+            var_name="variable",
+            value_name="valor"
+        )
+
+        grafico_doble = (
+            alt.Chart(df_peso_long)
+            .mark_line(point=True)
+            .encode(
+                x=alt.X("fecha_str:O", title="Fecha"),
+                y=alt.Y(
+                    "valor:Q",
+                    title="Valor",
+                    scale=alt.Scale(domain=[0, valor_max], nice=False, zero=True)
+                ),
+                color=alt.Color("variable:N", title="Serie"),
+                tooltip=[
+                    alt.Tooltip("fecha_str:O", title="Fecha"),
+                    alt.Tooltip("variable:N", title="Serie"),
+                    alt.Tooltip("valor:Q", title="Valor", format=".2f")
+                ]
+            )
+            .properties(height=280)
+        )
+
+        st.altair_chart(grafico_doble, use_container_width=True)
+    else:
+        st.info("Sin datos válidos de peso / IMC.")
+else:
+    st.info("Sin datos de peso / IMC.")
+
+st.divider()
 st.markdown("### Evaluación funcional")
 
 with st.container(border=True):
@@ -2723,6 +2806,174 @@ with st.container(border=True):
             except Exception as e:
                 st.error(f"Error al guardar: {e}")
 
+
+
+st.markdown("#### Historial funcional")
+
+df_historial = df_eval_export.copy()
+
+if not df_historial.empty:
+    filtro_historial_global = st.selectbox(
+        "Filtrar historial por prueba",
+        options=["Todas", "Caminata 6 minutos", "Prensión manual", "Levantarse de la silla"],
+        index=0,
+        key="filtro_historial_prueba"
+    )
+
+    prueba_filtro = filtro_historial_global
+
+    if prueba_filtro == "Todas":
+        df_historial_filtrado = df_historial.copy()
+    else:
+        df_historial_filtrado = df_historial[
+            df_historial["prueba"].astype(str).str.strip() == prueba_filtro
+        ].copy()
+
+    columnas_mostrar = ["id", "fecha", "prueba", "valor_medido", "percentil", "clasificacion"]
+    columnas_existentes = [c for c in columnas_mostrar if c in df_historial_filtrado.columns]
+
+    df_historial_mostrar = df_historial_filtrado[columnas_existentes].copy()
+
+    if "fecha" in df_historial_mostrar.columns:
+        df_historial_mostrar["fecha"] = pd.to_datetime(
+            df_historial_mostrar["fecha"],
+            errors="coerce"
+        ).dt.strftime("%Y-%m-%d")
+
+    df_historial_mostrar = df_historial_mostrar.sort_values(by="fecha", ascending=False)
+
+    st.markdown("**Fecha | Prueba | Valor | Percentil | Clasificación | Eliminar**")
+
+    for _, row in df_historial_mostrar.iterrows():
+        c1, c2, c3, c4, c5, c6 = st.columns([1, 2, 1, 1, 1, 0.5])
+
+        c1.write(row.get("fecha", ""))
+        c2.write(row.get("prueba", ""))
+        c3.write(row.get("valor_medido", ""))
+        c4.write(row.get("percentil", ""))
+        c5.write(row.get("clasificacion", ""))
+
+        if c6.button("🗑", key=f"del_{row['id']}"):
+            try:
+                eliminar_evaluacion(row["id"])
+                st.success("Evaluación eliminada.")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Error al eliminar: {e}")
+
+    st.markdown("#### Evolución del percentil funcional")
+
+    df_graf_base = df_eval_export.copy()
+
+    if not df_graf_base.empty and {"fecha", "percentil", "prueba", "clasificacion"}.issubset(df_graf_base.columns):
+        df_graf_base["fecha"] = pd.to_datetime(df_graf_base["fecha"], errors="coerce")
+        df_graf_base["percentil"] = pd.to_numeric(df_graf_base["percentil"], errors="coerce")
+        df_graf_base["prueba"] = df_graf_base["prueba"].astype(str).str.strip()
+        df_graf_base["clasificacion"] = df_graf_base["clasificacion"].astype(str).str.strip()
+        df_graf_base = df_graf_base.dropna(subset=["fecha", "percentil", "prueba"])
+
+        filtro_historial = st.session_state.get("filtro_historial_prueba", "Todas")
+        opciones_prueba = ["Caminata 6 minutos", "Prensión manual", "Levantarse de la silla"]
+
+        if filtro_historial != "Todas":
+            prueba_grafico = filtro_historial
+            st.markdown(f"**Prueba para gráfico:** {prueba_grafico}")
+        else:
+            prueba_grafico = st.selectbox(
+                "Prueba para gráfico",
+                options=opciones_prueba,
+                key="selector_grafico_prueba"
+            )
+
+        df_prueba = df_graf_base[df_graf_base["prueba"] == prueba_grafico].copy()
+
+        if not df_prueba.empty:
+            df_prueba = (
+                df_prueba.sort_values("fecha")
+                .groupby("fecha", as_index=False)
+                .agg({
+                    "percentil": "mean",
+                    "clasificacion": "last"
+                })
+            )
+
+            df_prueba["fecha_str"] = df_prueba["fecha"].dt.strftime("%Y-%m-%d")
+            df_prueba["Etiqueta"] = df_prueba["percentil"].apply(lambda x: f"P{round(x, 1)}")
+
+            dominio_x = df_prueba["fecha_str"].tolist()
+
+            linea_p50_df = pd.DataFrame({
+                "fecha_str": dominio_x,
+                "p50": [50] * len(dominio_x)
+            })
+
+            linea_p50 = alt.Chart(linea_p50_df).mark_line(strokeDash=[6, 4]).encode(
+                x=alt.X("fecha_str:O", title="Fecha", sort=dominio_x),
+                y=alt.Y(
+                    "p50:Q",
+                    title="Percentil",
+                    scale=alt.Scale(domain=[0, 100], nice=False, zero=True)
+                ),
+                tooltip=[alt.Tooltip("p50:Q", title="Referencia", format=".0f")]
+            )
+
+            linea = alt.Chart(df_prueba).mark_line().encode(
+                x=alt.X("fecha_str:O", title="Fecha", sort=dominio_x),
+                y=alt.Y(
+                    "percentil:Q",
+                    title="Percentil",
+                    scale=alt.Scale(domain=[0, 100], nice=False, zero=True)
+                ),
+                tooltip=[
+                    alt.Tooltip("fecha_str:O", title="Fecha"),
+                    alt.Tooltip("percentil:Q", title="Percentil", format=".1f"),
+                    alt.Tooltip("clasificacion:N", title="Clasificación")
+                ]
+            )
+
+            puntos = alt.Chart(df_prueba).mark_circle(size=110).encode(
+                x=alt.X("fecha_str:O", sort=dominio_x),
+                y=alt.Y(
+                    "percentil:Q",
+                    scale=alt.Scale(domain=[0, 100], nice=False, zero=True)
+                ),
+                color=alt.Color(
+                    "clasificacion:N",
+                    title="Clasificación",
+                    scale=alt.Scale(
+                        domain=["Muy bajo", "Bajo", "Ligeramente bajo", "Normal", "Bueno", "Muy bueno"],
+                        range=["#d32f2f", "#f57c00", "#fbc02d", "#388e3c", "#1976d2", "#00796b"]
+                    )
+                ),
+                tooltip=[
+                    alt.Tooltip("fecha_str:O", title="Fecha"),
+                    alt.Tooltip("percentil:Q", title="Percentil", format=".1f"),
+                    alt.Tooltip("clasificacion:N", title="Clasificación")
+                ]
+            )
+
+            etiquetas = alt.Chart(df_prueba).mark_text(
+                dy=-12,
+                fontSize=12
+            ).encode(
+                x=alt.X("fecha_str:O", sort=dominio_x),
+                y=alt.Y(
+                    "percentil:Q",
+                    scale=alt.Scale(domain=[0, 100], nice=False, zero=True)
+                ),
+                text="Etiqueta:N"
+            )
+
+            grafico = (linea_p50 + linea + puntos + etiquetas).properties(height=280)
+            st.altair_chart(grafico, use_container_width=True)
+        else:
+            st.info("Sin datos funcionales para esa prueba.")
+    else:
+        st.info("Sin historial funcional para graficar.")
+else:
+    st.info("Sin historial funcional.")
+
+st.divider()
 st.markdown("### Composición corporal")
 
 with st.container(border=True):
@@ -2848,6 +3099,50 @@ with st.container(border=True):
 # =========================================================
 # MEDICACIÓN
 # =========================================================
+
+
+st.markdown("#### Historial corporal")
+
+df_inbody = df_inbody_export.copy()
+if not df_inbody.empty:
+    df_inbody = enriquecer_historial_corporal(
+        df_inbody,
+        str(ficha["sexo"]).strip().lower(),
+        ficha["talla_m"]
+    )
+    df_inbody["fecha"] = pd.to_datetime(df_inbody["fecha"], errors="coerce")
+    df_inbody = df_inbody.dropna(subset=["fecha"]).sort_values("fecha", ascending=False)
+
+    st.markdown("**Fecha | Peso | IMC | % Grasa | Músculo | Diagnóstico | Eliminar**")
+
+    for _, row in df_inbody.iterrows():
+        c1, c2, c3, c4, c5, c6, c7 = st.columns([1.2, 1, 0.8, 1, 1, 1.8, 0.5])
+
+        fecha_txt = row["fecha"].strftime("%Y-%m-%d") if pd.notna(row.get("fecha")) else ""
+        peso_txt = f"{float(row['peso_kg']):.1f}" if pd.notna(row.get("peso_kg")) else ""
+        imc_txt = f"{float(row['imc']):.2f}" if pd.notna(row.get("imc")) else ""
+        grasa_txt = f"{float(row['grasa_corporal_pct']):.1f}" if pd.notna(row.get("grasa_corporal_pct")) else ""
+        musculo_txt = f"{float(row['masa_muscular_kg']):.1f}" if pd.notna(row.get("masa_muscular_kg")) else ""
+        diagnostico_txt = str(row.get("diagnostico_corporal", ""))
+
+        c1.write(fecha_txt)
+        c2.write(peso_txt)
+        c3.write(imc_txt)
+        c4.write(grasa_txt)
+        c5.write(musculo_txt)
+        c6.write(diagnostico_txt)
+
+        if c7.button("🗑", key=f"del_inbody_{row['id']}"):
+            try:
+                eliminar_registro_corporal(row["id"])
+                st.success("Registro corporal eliminado.")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Error al eliminar registro corporal: {e}")
+else:
+    st.info("Sin historial corporal.")
+
+st.divider()
 st.markdown("### Medicación")
 
 with st.container(border=True):
@@ -2950,343 +3245,9 @@ with st.container(border=True):
 st.divider()
 filtro_historial_global = "Todas"
 
-# =========================================================
-# HISTORIALES
-# =========================================================
-h1, h2 = st.columns([1, 1])
 
-with h1:
-    st.markdown("## Historial de peso / IMC")
-
-    df_peso_hist = df_peso_export.copy()
-
-    if not df_peso_hist.empty:
-        df_peso_hist["fecha"] = pd.to_datetime(df_peso_hist["fecha"], errors="coerce")
-        df_peso_hist = df_peso_hist.dropna(subset=["fecha"]).sort_values("fecha", ascending=False)
-
-        st.markdown("**Fecha | Peso | IMC | Eliminar**")
-
-        for _, row in df_peso_hist.iterrows():
-            c1, c2, c3, c4 = st.columns([1.2, 1, 1, 0.5])
-
-            fecha_txt = row["fecha"].strftime("%Y-%m-%d") if pd.notna(row.get("fecha")) else ""
-            peso_txt = f"{float(row['peso_kg']):.1f}" if pd.notna(row.get("peso_kg")) else ""
-            imc_txt = f"{float(row['imc']):.2f}" if pd.notna(row.get("imc")) else ""
-
-            c1.write(fecha_txt)
-            c2.write(peso_txt)
-            c3.write(imc_txt)
-
-            if c4.button("🗑", key=f"del_peso_{row['id']}"):
-                try:
-                    eliminar_registro_peso(row["id"])
-                    st.success("Registro de peso eliminado.")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Error al eliminar registro de peso: {e}")
-    else:
-        st.info("Sin historial de peso / IMC.")
-
-with h2:
-    st.markdown("## Historial corporal")
-
-    df_inbody = df_inbody_export.copy()
-    if not df_inbody.empty:
-        df_inbody = enriquecer_historial_corporal(
-            df_inbody,
-            str(ficha["sexo"]).strip().lower(),
-            ficha["talla_m"]
-        )
-        df_inbody["fecha"] = pd.to_datetime(df_inbody["fecha"], errors="coerce")
-        df_inbody = df_inbody.dropna(subset=["fecha"]).sort_values("fecha", ascending=False)
-
-        st.markdown("**Fecha | Peso | IMC | % Grasa | Músculo | Diagnóstico | Eliminar**")
-
-        for _, row in df_inbody.iterrows():
-            c1, c2, c3, c4, c5, c6, c7 = st.columns([1.2, 1, 0.8, 1, 1, 1.8, 0.5])
-
-            fecha_txt = row["fecha"].strftime("%Y-%m-%d") if pd.notna(row.get("fecha")) else ""
-            peso_txt = f"{float(row['peso_kg']):.1f}" if pd.notna(row.get("peso_kg")) else ""
-            imc_txt = f"{float(row['imc']):.2f}" if pd.notna(row.get("imc")) else ""
-            grasa_txt = f"{float(row['grasa_corporal_pct']):.1f}" if pd.notna(row.get("grasa_corporal_pct")) else ""
-            musculo_txt = f"{float(row['masa_muscular_kg']):.1f}" if pd.notna(row.get("masa_muscular_kg")) else ""
-            diagnostico_txt = str(row.get("diagnostico_corporal", ""))
-
-            c1.write(fecha_txt)
-            c2.write(peso_txt)
-            c3.write(imc_txt)
-            c4.write(grasa_txt)
-            c5.write(musculo_txt)
-            c6.write(diagnostico_txt)
-
-            if c7.button("🗑", key=f"del_inbody_{row['id']}"):
-                try:
-                    eliminar_registro_corporal(row["id"])
-                    st.success("Registro corporal eliminado.")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Error al eliminar registro corporal: {e}")
-    else:
-        st.info("Sin historial corporal.")
 
 st.divider()
-
-# =========================================================
-# HISTORIAL FUNCIONAL
-# =========================================================
-st.markdown("## Historial funcional")
-
-df_historial = df_eval_export.copy()
-
-if not df_historial.empty:
-    filtro_historial_global = st.selectbox(
-        "Filtrar historial por prueba",
-        options=["Todas", "Caminata 6 minutos", "Prensión manual", "Levantarse de la silla"],
-        index=0,
-        key="filtro_historial_prueba"
-    )
-
-    prueba_filtro = filtro_historial_global
-
-    if prueba_filtro == "Todas":
-        df_historial_filtrado = df_historial.copy()
-    else:
-        df_historial_filtrado = df_historial[
-            df_historial["prueba"].astype(str).str.strip() == prueba_filtro
-        ].copy()
-
-    columnas_mostrar = ["id", "fecha", "prueba", "valor_medido", "percentil", "clasificacion"]
-    columnas_existentes = [c for c in columnas_mostrar if c in df_historial_filtrado.columns]
-
-    df_historial_mostrar = df_historial_filtrado[columnas_existentes].copy()
-
-    if "fecha" in df_historial_mostrar.columns:
-        df_historial_mostrar["fecha"] = pd.to_datetime(
-            df_historial_mostrar["fecha"],
-            errors="coerce"
-        ).dt.strftime("%Y-%m-%d")
-
-    df_historial_mostrar = df_historial_mostrar.sort_values(by="fecha", ascending=False)
-
-    st.markdown("**Fecha | Prueba | Valor | Percentil | Clasificación | Eliminar**")
-
-    for _, row in df_historial_mostrar.iterrows():
-        c1, c2, c3, c4, c5, c6 = st.columns([1, 2, 1, 1, 1, 0.5])
-
-        c1.write(row.get("fecha", ""))
-        c2.write(row.get("prueba", ""))
-        c3.write(row.get("valor_medido", ""))
-        c4.write(row.get("percentil", ""))
-        c5.write(row.get("clasificacion", ""))
-
-        if c6.button("🗑", key=f"del_{row['id']}"):
-            try:
-                eliminar_evaluacion(row["id"])
-                st.success("Evaluación eliminada.")
-                st.rerun()
-            except Exception as e:
-                st.error(f"Error al eliminar: {e}")
-
-else:
-    st.info("Sin historial funcional.")
-
-st.divider()
-
-# =========================================================
-# GRÁFICOS
-# =========================================================
-st.markdown("## Gráficos")
-
-g1, g2 = st.columns([1, 1])
-
-with g1:
-    st.markdown("### Evolución de peso e IMC")
-
-    df_peso = df_peso_export.copy()
-
-    if not df_peso.empty:
-        df_peso["fecha"] = pd.to_datetime(df_peso["fecha"], errors="coerce")
-        df_peso["peso_kg"] = pd.to_numeric(df_peso["peso_kg"], errors="coerce")
-        df_peso["imc"] = pd.to_numeric(df_peso["imc"], errors="coerce")
-        df_peso = df_peso.dropna(subset=["fecha", "peso_kg", "imc"]).sort_values("fecha", ascending=True)
-
-        if not df_peso.empty:
-            df_peso["fecha_str"] = df_peso["fecha"].dt.strftime("%Y-%m-%d")
-
-            valor_max = max(df_peso["peso_kg"].max(), df_peso["imc"].max())
-            valor_max = max(10, round(valor_max * 1.10, 1))
-
-            df_peso_long = df_peso.melt(
-                id_vars=["fecha_str"],
-                value_vars=["peso_kg", "imc"],
-                var_name="variable",
-                value_name="valor"
-            )
-
-            grafico_doble = (
-                alt.Chart(df_peso_long)
-                .mark_line(point=True)
-                .encode(
-                    x=alt.X("fecha_str:O", title="Fecha"),
-                    y=alt.Y(
-                        "valor:Q",
-                        title="Valor",
-                        scale=alt.Scale(domain=[0, valor_max], nice=False, zero=True)
-                    ),
-                    color=alt.Color("variable:N", title="Serie"),
-                    tooltip=[
-                        alt.Tooltip("fecha_str:O", title="Fecha"),
-                        alt.Tooltip("variable:N", title="Serie"),
-                        alt.Tooltip("valor:Q", title="Valor", format=".2f")
-                    ]
-                )
-                .properties(height=320)
-            )
-
-            st.altair_chart(grafico_doble, use_container_width=True)
-        else:
-            st.info("Sin datos válidos de peso / IMC.")
-    else:
-        st.info("Sin datos de peso / IMC.")
-
-with g2:
-    st.markdown("### Evolución del percentil funcional")
-
-    df_historial = df_eval_export.copy()
-
-    if not df_historial.empty and {"fecha", "percentil", "prueba", "clasificacion"}.issubset(df_historial.columns):
-        df_graf_base = df_historial.copy()
-        df_graf_base["fecha"] = pd.to_datetime(df_graf_base["fecha"], errors="coerce")
-        df_graf_base["percentil"] = pd.to_numeric(df_graf_base["percentil"], errors="coerce")
-        df_graf_base["prueba"] = df_graf_base["prueba"].astype(str).str.strip()
-        df_graf_base["clasificacion"] = df_graf_base["clasificacion"].astype(str).str.strip()
-        df_graf_base = df_graf_base.dropna(subset=["fecha", "percentil", "prueba"])
-
-        filtro_historial = st.session_state.get("filtro_historial_prueba", "Todas")
-        opciones_prueba = ["Caminata 6 minutos", "Prensión manual", "Levantarse de la silla"]
-
-        if filtro_historial != "Todas":
-            prueba_grafico = filtro_historial
-            st.markdown(f"**Prueba para gráfico:** {prueba_grafico}")
-        else:
-            prueba_grafico = st.selectbox(
-                "Prueba para gráfico",
-                options=opciones_prueba,
-                key="selector_grafico_prueba"
-            )
-
-        df_prueba = df_graf_base[df_graf_base["prueba"] == prueba_grafico].copy()
-
-        if not df_prueba.empty:
-            df_prueba = (
-                df_prueba.sort_values("fecha")
-                .groupby("fecha", as_index=False)
-                .agg({
-                    "percentil": "mean",
-                    "clasificacion": "last"
-                })
-            )
-
-            df_prueba["fecha_str"] = df_prueba["fecha"].dt.strftime("%Y-%m-%d")
-            df_prueba["Etiqueta"] = df_prueba["percentil"].apply(lambda x: f"P{round(x, 1)}")
-
-            dominio_x = df_prueba["fecha_str"].tolist()
-
-            linea_p50_df = pd.DataFrame({
-                "fecha_str": dominio_x,
-                "p50": [50] * len(dominio_x)
-            })
-
-            linea_p50 = alt.Chart(linea_p50_df).mark_line(strokeDash=[6, 4]).encode(
-                x=alt.X("fecha_str:O", title="Fecha", sort=dominio_x),
-                y=alt.Y(
-                    "p50:Q",
-                    title="Percentil",
-                    scale=alt.Scale(domain=[0, 100], nice=False, zero=True)
-                ),
-                tooltip=[alt.Tooltip("p50:Q", title="Referencia", format=".0f")]
-            )
-
-            linea = alt.Chart(df_prueba).mark_line().encode(
-                x=alt.X("fecha_str:O", title="Fecha", sort=dominio_x),
-                y=alt.Y(
-                    "percentil:Q",
-                    title="Percentil",
-                    scale=alt.Scale(domain=[0, 100], nice=False, zero=True)
-                ),
-                tooltip=[
-                    alt.Tooltip("fecha_str:O", title="Fecha"),
-                    alt.Tooltip("percentil:Q", title="Percentil", format=".1f"),
-                    alt.Tooltip("clasificacion:N", title="Clasificación")
-                ]
-            )
-
-            puntos = alt.Chart(df_prueba).mark_circle(size=110).encode(
-                x=alt.X("fecha_str:O", sort=dominio_x),
-                y=alt.Y(
-                    "percentil:Q",
-                    scale=alt.Scale(domain=[0, 100], nice=False, zero=True)
-                ),
-                color=alt.Color(
-                    "clasificacion:N",
-                    title="Clasificación",
-                    scale=alt.Scale(
-                        domain=["Muy bajo", "Bajo", "Ligeramente bajo", "Normal", "Bueno", "Muy bueno"],
-                        range=["#d32f2f", "#f57c00", "#fbc02d", "#388e3c", "#1976d2", "#00796b"]
-                    )
-                ),
-                tooltip=[
-                    alt.Tooltip("fecha_str:O", title="Fecha"),
-                    alt.Tooltip("percentil:Q", title="Percentil", format=".1f"),
-                    alt.Tooltip("clasificacion:N", title="Clasificación")
-                ]
-            )
-
-            etiquetas = alt.Chart(df_prueba).mark_text(
-                dy=-12,
-                fontSize=12
-            ).encode(
-                x=alt.X("fecha_str:O", sort=dominio_x),
-                y=alt.Y(
-                    "percentil:Q",
-                    scale=alt.Scale(domain=[0, 100], nice=False, zero=True)
-                ),
-                text="Etiqueta:N"
-            )
-
-            grafico = (linea_p50 + linea + puntos + etiquetas).properties(height=320)
-            st.altair_chart(grafico, use_container_width=True)
-
-            ultimo = df_prueba["percentil"].iloc[-1]
-
-            if len(df_prueba) >= 2:
-                anterior = df_prueba["percentil"].iloc[-2]
-                diferencia = round(ultimo - anterior, 1)
-
-                fecha_ult = df_prueba["fecha"].iloc[-1]
-                fecha_ant = df_prueba["fecha"].iloc[-2]
-                dias = (fecha_ult - fecha_ant).days if pd.notna(fecha_ult) and pd.notna(fecha_ant) else None
-
-                if diferencia > 0:
-                    if dias is not None:
-                        st.success(f"Tendencia funcional favorable: +{diferencia} percentiles en {dias} días.")
-                    else:
-                        st.success(f"Tendencia funcional favorable: +{diferencia} percentiles.")
-                elif diferencia < 0:
-                    if dias is not None:
-                        st.warning(f"Tendencia funcional desfavorable: -{abs(diferencia)} percentiles en {dias} días.")
-                    else:
-                        st.warning(f"Tendencia funcional desfavorable: -{abs(diferencia)} percentiles.")
-                else:
-                    st.info("Tendencia funcional estable respecto de la evaluación anterior.")
-
-            elif len(df_prueba) == 1:
-                clasif_actual = df_prueba["clasificacion"].iloc[-1]
-                st.info(f"Una sola evaluación disponible. Clasificación actual: {clasif_actual}.")
-        else:
-            st.info("Sin datos funcionales para esa prueba.")
-    else:
-        st.info("Sin historial funcional para graficar.")
 
 # =========================================================
 # INFORME INTEGRADO
