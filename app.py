@@ -120,7 +120,7 @@ def preparar_dataset_longitudinal(df_estadistico):
 # CONFIG
 # =========================================================
 st.set_page_config(
-    page_title="Calculadora de Condición Física",
+    page_title="Método Dra. Petratti",
     page_icon="💪",
     layout="wide"
 )
