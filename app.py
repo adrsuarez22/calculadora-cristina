@@ -150,21 +150,6 @@ st.markdown("""
     right: 1rem;
 }
 
-st.markdown("""
-<style>
-h1 {
-    font-size: 3.4rem !important;
-    font-weight: 800 !important;
-    margin-bottom: 0.2rem !important;
-}
-
-[data-testid="stCaptionContainer"] {
-    font-size: 1.1rem !important;
-    color: #5f6368 !important;
-}
-</style>
-""", unsafe_allow_html=True)
-
 .block-container {
     padding-top: 1.5rem;
     padding-bottom: 2rem;
