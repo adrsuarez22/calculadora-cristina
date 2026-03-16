@@ -2455,7 +2455,7 @@ with top3:
         st.download_button(
             label="Descargar PDF",
             data=st.session_state[pdf_state_key],
-            file_name=f"{paciente_nombre.replace(' ', '_')}_Metodo_Dra_Petratti.pdf"
+            file_name=f"{paciente_nombre.replace(' ', '_')}_Metodo_Dra_Petratti.pdf",
             mime="application/pdf",
             key=f"descargar_pdf_final_{paciente_id}"
         )
