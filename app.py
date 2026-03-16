@@ -2080,10 +2080,10 @@ with top1:
         key="busqueda_paciente"
     )
 
-pacientes_filtrados = [
-    p for p in pacientes
-    if busqueda_paciente.strip().lower() in str(p["nombre"]).strip().lower()
-]    
+    pacientes_filtrados = [
+        p for p in pacientes
+        if busqueda_paciente.strip().lower() in str(p["nombre"]).strip().lower()
+    ]
 
     etiquetas = []
 
@@ -2109,22 +2109,27 @@ pacientes_filtrados = [
     paciente_actual = pacientes_filtrados[indice]
     paciente_id = paciente_actual["id"]
     paciente_nombre = paciente_actual["nombre"]
-    
+
+
 with top4:
     st.markdown("###")
+
     confirmar_eliminar = st.checkbox(
         "Confirmar borrado",
         key=f"confirmar_borrado_{paciente_id}"
     )
 
     if st.button("Eliminar paciente", key=f"btn_eliminar_paciente_{paciente_id}"):
+
         if not confirmar_eliminar:
             st.warning("Marcá la confirmación antes de eliminar.")
+
         else:
             try:
                 eliminar_paciente(paciente_id)
                 st.success("Paciente eliminado correctamente.")
                 st.rerun()
+
             except Exception as e:
                 st.error(f"Error al eliminar paciente: {e}")
 
