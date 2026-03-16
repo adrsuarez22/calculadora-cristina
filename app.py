@@ -1817,7 +1817,22 @@ def _tabla_pdf_desde_df(df, columnas, titulos, anchos_cm, styles):
         ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
     ]))
     return tabla
+    
+def header_pdf(canvas, doc):
+    logo_path = "LogoPetratti.jpeg"
 
+    try:
+        canvas.drawImage(
+            logo_path,
+            doc.pagesize[0] - 7 * cm,
+            doc.pagesize[1] - 3.2 * cm,
+            width=6 * cm,
+            height=2.4 * cm,
+            preserveAspectRatio=True,
+            mask="auto"
+        )
+    except Exception:
+        pass
 
 def generar_pdf_paciente(ficha, df_peso, df_inbody, df_eval, df_medicacion):
     buffer = BytesIO()
@@ -1986,7 +2001,11 @@ def generar_pdf_paciente(ficha, df_peso, df_inbody, df_eval, df_medicacion):
     story.append(Paragraph("www.cristinapetratti.com", styles["Firma"]))
     story.append(Paragraph("Instagram: @crispetratti", styles["Firma"]))
 
-    doc.build(story)
+    doc.build(
+    story,
+    onFirstPage=header_pdf,
+    onLaterPages=header_pdf
+    )
     buffer.seek(0)
     return buffer
 
