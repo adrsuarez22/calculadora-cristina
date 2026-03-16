@@ -1762,6 +1762,27 @@ def _df_para_pdf(df):
     return out.fillna("-")
 
 
+def _valor_numerico_o_none(valor):
+    if valor in [None, "", "-"]:
+        return None
+    try:
+        if pd.isna(valor):
+            return None
+    except Exception:
+        pass
+    try:
+        return float(valor)
+    except (TypeError, ValueError):
+        return None
+
+
+def _formatear_numero_pdf(valor, decimales=2):
+    numero = _valor_numerico_o_none(valor)
+    if numero is None:
+        return "-"
+    return f"{numero:.{decimales}f}"
+
+
 def _tabla_pdf_desde_df(df, columnas, titulos, anchos_cm, styles):
     if df is None or df.empty:
         return Paragraph("Sin datos.", styles["Normal"])
@@ -1816,13 +1837,14 @@ def generar_pdf_paciente(ficha, df_peso, df_inbody, df_eval, df_medicacion):
     styles.add(ParagraphStyle(name="TablaHeader", parent=styles["Normal"], fontSize=8, textColor=colors.white))
     styles.add(ParagraphStyle(name="TablaBody", parent=styles["Normal"], fontSize=7.5, leading=9))
     styles.add(ParagraphStyle(name="Caja", parent=styles["Normal"], fontSize=9, leading=12))
+    styles.add(ParagraphStyle(name="Firma", parent=styles["Normal"], fontSize=9.5, leading=12, spaceAfter=2))
 
     story = []
 
-    story.append(Paragraph("Reporte completo del paciente", styles["TituloMain"]))
-    story.append(Paragraph(f"<b>Paciente:</b> {_texto_seguro(ficha['nombre'])}", styles["Caja"]))
-    story.append(Paragraph(f"<b>Sexo:</b> {_texto_seguro(ficha['sexo'])}", styles["Caja"]))
-    story.append(Paragraph(f"<b>Talla:</b> {_texto_seguro(ficha['talla_m'])} m", styles["Caja"]))
+    story.append(Paragraph("Método Dra. Petratti", styles["TituloMain"]))
+    story.append(Paragraph(f"<b>Paciente:</b> {_texto_seguro(ficha.get('nombre'))}", styles["Caja"]))
+    story.append(Paragraph(f"<b>Sexo:</b> {_texto_seguro(ficha.get('sexo'))}", styles["Caja"]))
+    story.append(Paragraph(f"<b>Talla:</b> {_texto_seguro(ficha.get('talla_m'))} m", styles["Caja"]))
     story.append(Paragraph(f"<b>Fecha del reporte:</b> {datetime.now().strftime('%Y-%m-%d %H:%M')}", styles["Caja"]))
     story.append(Spacer(1, 0.25 * cm))
 
@@ -1843,8 +1865,8 @@ def generar_pdf_paciente(ficha, df_peso, df_inbody, df_eval, df_medicacion):
     if df_inbody_pdf is not None and not df_inbody_pdf.empty:
         df_inbody_pdf = enriquecer_historial_corporal(
             df_inbody_pdf,
-            str(ficha["sexo"]).strip().lower(),
-            ficha["talla_m"]
+            str(ficha.get("sexo", "")).strip().lower(),
+            ficha.get("talla_m")
         )
         df_inbody_pdf = _df_para_pdf(df_inbody_pdf)
 
@@ -1873,16 +1895,26 @@ def generar_pdf_paciente(ficha, df_peso, df_inbody, df_eval, df_medicacion):
 
     ultimo_peso_pdf = obtener_ultimo_registro(df_peso_pdf, "fecha")
     if ultimo_peso_pdf is not None:
-        icc_pdf = ultimo_peso_pdf.get("icc")
-        ica_pdf = ultimo_peso_pdf.get("ica")
+        icc_pdf = _valor_numerico_o_none(ultimo_peso_pdf.get("icc"))
+        ica_pdf = _valor_numerico_o_none(ultimo_peso_pdf.get("ica"))
+
         clasif_icc_pdf = clasificacion_icc(ficha.get("sexo"), icc_pdf)
         clasif_ica_pdf = clasificacion_ica(ica_pdf)
         clasif_abdominal_pdf = clasificacion_obesidad_abdominal(ficha.get("sexo"), icc_pdf, ica_pdf)
 
         story.append(Paragraph("Clasificación abdominal automática", styles["SubTitulo"]))
-        story.append(Paragraph(f"<b>ICC:</b> {_texto_seguro(round(float(icc_pdf), 2) if pd.notna(icc_pdf) else '-') } — {_texto_seguro(clasif_icc_pdf)}", styles["Caja"]))
-        story.append(Paragraph(f"<b>ICA:</b> {_texto_seguro(round(float(ica_pdf), 2) if pd.notna(ica_pdf) else '-') } — {_texto_seguro(clasif_ica_pdf)}", styles["Caja"]))
-        story.append(Paragraph(f"<b>Conclusión abdominal:</b> {_texto_seguro(clasif_abdominal_pdf)}", styles["Caja"]))
+        story.append(Paragraph(
+            f"<b>ICC:</b> {_formatear_numero_pdf(icc_pdf, 2)} — {_texto_seguro(clasif_icc_pdf)}",
+            styles["Caja"]
+        ))
+        story.append(Paragraph(
+            f"<b>ICA:</b> {_formatear_numero_pdf(ica_pdf, 2)} — {_texto_seguro(clasif_ica_pdf)}",
+            styles["Caja"]
+        ))
+        story.append(Paragraph(
+            f"<b>Conclusión abdominal:</b> {_texto_seguro(clasif_abdominal_pdf)}",
+            styles["Caja"]
+        ))
         story.append(Spacer(1, 0.25 * cm))
     else:
         story.append(Spacer(1, 0.35 * cm))
@@ -1943,6 +1975,16 @@ def generar_pdf_paciente(ficha, df_peso, df_inbody, df_eval, df_medicacion):
         anchos_cm=[2.0, 3.4, 4.2, 1.5, 2.8, 3.6],
         styles=styles
     ))
+
+    story.append(Spacer(1, 0.55 * cm))
+    story.append(Paragraph("<font color='#B0B7C3'>______________________________________________</font>", styles["Caja"]))
+    story.append(Spacer(1, 0.12 * cm))
+    story.append(Paragraph("<b>Dra. Cristina B. Petratti</b>", styles["Firma"]))
+    story.append(Paragraph("Médico de Familia – Especialista en Obesidad y Nutrición", styles["Firma"]))
+    story.append(Paragraph("Nº Colegiada: 032880978", styles["Firma"]))
+    story.append(Paragraph("Método Dra. Petratti", styles["Firma"]))
+    story.append(Paragraph("www.cristinapetratti.com", styles["Firma"]))
+    story.append(Paragraph("Instagram: @crispetratti", styles["Firma"]))
 
     doc.build(story)
     buffer.seek(0)
