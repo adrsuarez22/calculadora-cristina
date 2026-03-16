@@ -2519,442 +2519,433 @@ st.divider()
 st.markdown("## Ingreso de datos")
 
 # =========================================================
-# FILA 1: PESO / IMC  |  EVALUACIÓN FUNCIONAL
+# PESO E IMC
 # =========================================================
-fila1_col1, fila1_col2 = st.columns([1, 1])
+st.markdown("### Peso e IMC")
 
-with fila1_col1:
-    st.markdown("### Peso e IMC")
+with st.container(border=True):
+    if ficha["talla_m"] is None or float(ficha["talla_m"]) <= 0:
+        st.warning("Este paciente no tiene una talla válida cargada en la tabla pacientes.")
+    else:
+        col_p1, col_p2, col_p3 = st.columns(3)
 
-    with st.container(border=True):
-        if ficha["talla_m"] is None or float(ficha["talla_m"]) <= 0:
-            st.warning("Este paciente no tiene una talla válida cargada en la tabla pacientes.")
-        else:
-            col_p1, col_p2, col_p3 = st.columns(3)
-
-            with col_p1:
-                fecha_peso = st.date_input(
-                    "Fecha de peso",
-                    value=date.today(),
-                    key=f"fecha_peso_{paciente_id}"
-                )
-
-            with col_p2:
-                peso_kg = st.number_input(
-                    "Peso (kg)",
-                    min_value=0.0,
-                    max_value=300.0,
-                    step=0.1,
-                    format="%.1f",
-                    key=f"peso_kg_{paciente_id}"
-                )
-
-            with col_p3:
-                imc_calculado = round(float(peso_kg) / (float(ficha["talla_m"]) ** 2), 2)
-                clasificacion_imc, color_imc = clasificar_imc(imc_calculado)
-                st.markdown(f"**IMC:** {imc_calculado:.2f}")
-                st.markdown(f"**Clasificación:** {color_imc} {clasificacion_imc}")
-
-            bp1, bp2 = st.columns(2)
-
-            with bp1:
-                if st.button("Guardar peso", key=f"btn_guardar_peso_{paciente_id}"):
-                    try:
-                        guardar_peso(
-                            paciente_id=paciente_id,
-                            fecha_medicion=fecha_peso,
-                            peso_kg=peso_kg,
-                            talla_m=ficha["talla_m"]
-                        )
-                        st.success("Peso guardado correctamente.")
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Error al guardar peso: {e}")
-
-            with bp2:
-                if st.button(
-                    "Borrar último peso",
-                    key=f"btn_borrar_ultimo_peso_{paciente_id}",
-                    disabled=ultimo_id_peso is None
-                ):
-                    try:
-                        eliminar_registro_peso(ultimo_id_peso)
-                        st.success("Último registro de peso eliminado.")
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Error al borrar último peso: {e}")
-
-with fila1_col2:
-    st.markdown("### Evaluación funcional")
-
-    with st.container(border=True):
-        paciente_sexo_guardado = paciente_actual["sexo"] if paciente_actual else None
-
-        prueba = st.selectbox(
-            "Seleccionar prueba",
-            ["Caminata 6 minutos", "Prensión manual", "Levantarse de la silla"],
-            key="selector_prueba"
-        )
-
-        sexo_default = "Hombre"
-        if paciente_sexo_guardado == "mujer":
-            sexo_default = "Mujer"
-        elif paciente_sexo_guardado == "hombre":
-            sexo_default = "Hombre"
-
-        sexo = st.selectbox(
-            "Sexo",
-            ["Hombre", "Mujer"],
-            index=0 if sexo_default == "Hombre" else 1,
-            key="selector_sexo"
-        )
-
-        altura = None
-        valor_medido = None
-
-        if prueba == "Caminata 6 minutos":
-            edad = st.selectbox("Edad", list(range(40, 81)), index=20, key="edad_caminata")
-            altura = st.selectbox("Altura (cm)", [150, 160, 170, 180, 190], index=2, key="altura_caminata")
-            valor_medido = st.number_input(
-                "Distancia caminada (metros)",
-                min_value=0.0,
-                max_value=2000.0,
-                step=1.0,
-                format="%.2f",
-                key="valor_caminata"
+        with col_p1:
+            fecha_peso = st.date_input(
+                "Fecha de peso",
+                value=date.today(),
+                key=f"fecha_peso_{paciente_id}"
             )
 
-        elif prueba == "Prensión manual":
-            edad = st.selectbox("Edad", list(range(20, 101)), index=45, key="edad_prension")
-            valor_medido = st.number_input(
-                "Fuerza de prensión (kg)",
+        with col_p2:
+            peso_kg = st.number_input(
+                "Peso (kg)",
                 min_value=0.0,
-                max_value=100.0,
+                max_value=300.0,
                 step=0.1,
                 format="%.1f",
-                key="valor_prension"
+                key=f"peso_kg_{paciente_id}"
             )
 
-        elif prueba == "Levantarse de la silla":
-            edad = st.selectbox("Edad", list(range(65, 101)), index=10, key="edad_silla")
-            valor_medido = st.number_input(
-                "Cantidad de repeticiones",
-                min_value=0.0,
-                max_value=60.0,
-                step=1.0,
-                format="%.0f",
-                key="valor_silla"
-            )
+        with col_p3:
+            imc_calculado = round(float(peso_kg) / (float(ficha["talla_m"]) ** 2), 2)
+            clasificacion_imc, color_imc = clasificar_imc(imc_calculado)
+            st.markdown(f"**IMC:** {imc_calculado:.2f}")
+            st.markdown(f"**Clasificación:** {color_imc} {clasificacion_imc}")
 
-        percentil, clasificacion, referencia_p50, referencia_altura, referencia_edad = calcular_resultado(
-            prueba=prueba,
-            sexo=sexo,
-            edad=edad,
-            altura=altura,
-            valor_medido=valor_medido
-        )
+        bp1, bp2 = st.columns(2)
 
-        color = color_clasificacion(clasificacion)
-
-        st.markdown(
-            f"""
-            <div style="
-                background-color:{color};
-                color:white;
-                padding:10px 12px;
-                border-radius:8px;
-                text-align:center;
-                font-size:18px;
-                font-weight:600;
-                margin-top:18px;
-                margin-bottom:10px;
-            ">
-                {clasificacion}
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-
-        st.markdown(
-            f"""
-            <div style="
-                background-color:#dff0e6;
-                color:#1b5e20;
-                padding:8px 12px;
-                border-radius:8px;
-                font-size:15px;
-                margin-bottom:14px;
-            ">
-                Percentil estimado: <b>P{percentil if percentil is not None else "-"}</b>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-
-        st.write(f"**Rango percentilar:** {rango_percentilar(percentil)}")
-        st.write(f"**Referencia P50:** {referencia_p50}")
-
-        if referencia_altura != "-":
-            st.write(f"**Referencia de altura:** {referencia_altura}")
-
-        if referencia_edad != "-":
-            st.write(f"**Referencia etaria:** {referencia_edad}")
-
-        st.write(f"**Interpretación clínica:** {interpretacion_clinica(clasificacion)}")
-
-        if st.button("Guardar evaluación", key="btn_guardar_evaluacion"):
-            if not paciente_nombre:
-                st.warning("Seleccioná un paciente antes de guardar.")
-            elif percentil is None:
-                st.warning("No se pudo calcular el percentil.")
-            else:
+        with bp1:
+            if st.button("Guardar peso", key=f"btn_guardar_peso_{paciente_id}"):
                 try:
-                    guardar_evaluacion(
+                    guardar_peso(
                         paciente_id=paciente_id,
-                        paciente_nombre=paciente_nombre,
-                        sexo=sexo,
-                        edad=edad,
-                        prueba=prueba,
-                        valor_medido=valor_medido,
-                        percentil=percentil,
-                        clasificacion=clasificacion
+                        fecha_medicion=fecha_peso,
+                        peso_kg=peso_kg,
+                        talla_m=ficha["talla_m"]
                     )
-                    st.success("Evaluación guardada correctamente.")
+                    st.success("Peso guardado correctamente.")
                     st.rerun()
                 except Exception as e:
-                    st.error(f"Error al guardar: {e}")
+                    st.error(f"Error al guardar peso: {e}")
 
-# =========================================================
-# FILA 2: COMPOSICIÓN CORPORAL  |  MEDICACIÓN
-# =========================================================
-fila2_col1, fila2_col2 = st.columns([1, 1])
+        with bp2:
+            if st.button(
+                "Borrar último peso",
+                key=f"btn_borrar_ultimo_peso_{paciente_id}",
+                disabled=ultimo_id_peso is None
+            ):
+                try:
+                    eliminar_registro_peso(ultimo_id_peso)
+                    st.success("Último registro de peso eliminado.")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error al borrar último peso: {e}")
 
-with fila2_col1:
-    st.markdown("### Composición corporal")
+st.markdown("### Evaluación funcional")
 
-    with st.container(border=True):
-        if ficha["talla_m"] is None or float(ficha["talla_m"]) <= 0:
-            st.warning("Para cargar composición corporal primero hay que tener una talla válida en el paciente.")
+with st.container(border=True):
+    paciente_sexo_guardado = paciente_actual["sexo"] if paciente_actual else None
+
+    prueba = st.selectbox(
+        "Seleccionar prueba",
+        ["Caminata 6 minutos", "Prensión manual", "Levantarse de la silla"],
+        key="selector_prueba"
+    )
+
+    sexo_default = "Hombre"
+    if paciente_sexo_guardado == "mujer":
+        sexo_default = "Mujer"
+    elif paciente_sexo_guardado == "hombre":
+        sexo_default = "Hombre"
+
+    sexo = st.selectbox(
+        "Sexo",
+        ["Hombre", "Mujer"],
+        index=0 if sexo_default == "Hombre" else 1,
+        key="selector_sexo"
+    )
+
+    altura = None
+    valor_medido = None
+
+    if prueba == "Caminata 6 minutos":
+        col_f1, col_f2 = st.columns(2)
+        with col_f1:
+            edad = st.selectbox("Edad", list(range(40, 81)), index=20, key="edad_caminata")
+        with col_f2:
+            altura = st.selectbox("Altura (cm)", [150, 160, 170, 180, 190], index=2, key="altura_caminata")
+        valor_medido = st.number_input(
+            "Distancia caminada (metros)",
+            min_value=0.0,
+            max_value=2000.0,
+            step=1.0,
+            format="%.2f",
+            key="valor_caminata"
+        )
+
+    elif prueba == "Prensión manual":
+        edad = st.selectbox("Edad", list(range(20, 101)), index=45, key="edad_prension")
+        valor_medido = st.number_input(
+            "Fuerza de prensión (kg)",
+            min_value=0.0,
+            max_value=100.0,
+            step=0.1,
+            format="%.1f",
+            key="valor_prension"
+        )
+
+    elif prueba == "Levantarse de la silla":
+        edad = st.selectbox("Edad", list(range(65, 101)), index=10, key="edad_silla")
+        valor_medido = st.number_input(
+            "Cantidad de repeticiones",
+            min_value=0.0,
+            max_value=60.0,
+            step=1.0,
+            format="%.0f",
+            key="valor_silla"
+        )
+
+    percentil, clasificacion, referencia_p50, referencia_altura, referencia_edad = calcular_resultado(
+        prueba=prueba,
+        sexo=sexo,
+        edad=edad,
+        altura=altura,
+        valor_medido=valor_medido
+    )
+
+    color = color_clasificacion(clasificacion)
+
+    st.markdown(
+        f"""
+        <div style="
+            background-color:{color};
+            color:white;
+            padding:10px 12px;
+            border-radius:8px;
+            text-align:center;
+            font-size:18px;
+            font-weight:600;
+            margin-top:18px;
+            margin-bottom:10px;
+        ">
+            {clasificacion}
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    st.markdown(
+        f"""
+        <div style="
+            background-color:#dff0e6;
+            color:#1b5e20;
+            padding:8px 12px;
+            border-radius:8px;
+            font-size:15px;
+            margin-bottom:14px;
+        ">
+            Percentil estimado: <b>P{percentil if percentil is not None else "-"}</b>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    st.write(f"**Rango percentilar:** {rango_percentilar(percentil)}")
+    st.write(f"**Referencia P50:** {referencia_p50}")
+
+    if referencia_altura != "-":
+        st.write(f"**Referencia de altura:** {referencia_altura}")
+
+    if referencia_edad != "-":
+        st.write(f"**Referencia etaria:** {referencia_edad}")
+
+    st.write(f"**Interpretación clínica:** {interpretacion_clinica(clasificacion)}")
+
+    if st.button("Guardar evaluación", key="btn_guardar_evaluacion"):
+        if not paciente_nombre:
+            st.warning("Seleccioná un paciente antes de guardar.")
+        elif percentil is None:
+            st.warning("No se pudo calcular el percentil.")
         else:
-            sexo_corporal = str(ficha["sexo"]).strip().lower()
-
-            col_c1, col_c2 = st.columns(2)
-
-            with col_c1:
-                fecha_inbody = st.date_input("Fecha estudio", value=date.today(), key=f"inbody_fecha_{paciente_id}")
-                peso_inbody = st.number_input("Peso (kg)", min_value=0.0, max_value=300.0, step=0.1, key=f"inbody_peso_{paciente_id}")
-                imc_inbody_calc = round(float(peso_inbody) / (float(ficha["talla_m"]) ** 2), 2) if peso_inbody and ficha["talla_m"] else 0.0
-                st.markdown(f"**IMC calculado:** {imc_inbody_calc:.2f}")
-                grasa_pct = st.number_input("% grasa corporal", min_value=0.0, max_value=80.0, step=0.1, key=f"inbody_grasa_{paciente_id}")
-
-            with col_c2:
-                masa_muscular = st.number_input("Masa muscular (kg)", min_value=0.0, max_value=100.0, step=0.1, key=f"inbody_musculo_{paciente_id}")
-                agua_pct = st.number_input("% agua corporal", min_value=0.0, max_value=100.0, step=0.1, key=f"inbody_agua_{paciente_id}")
-                grasa_visceral = st.number_input("Grasa visceral", min_value=0.0, max_value=30.0, step=0.1, key=f"inbody_visceral_{paciente_id}")
-                metabolismo = st.number_input("Metabolismo basal", min_value=0.0, max_value=4000.0, step=10.0, key=f"inbody_metabolismo_{paciente_id}")
-
-            observaciones_inbody = st.text_area(
-                "Observaciones",
-                key=f"inbody_obs_{paciente_id}",
-                height=80
-            )
-
-            resultado_corporal = evaluar_perfil_morfofuncional(
-                sexo=sexo_corporal,
-                peso_kg=peso_inbody,
-                talla_m=ficha["talla_m"],
-                grasa_pct=grasa_pct,
-                masa_muscular_kg=masa_muscular,
-                agua_pct=agua_pct,
-                grasa_visceral=grasa_visceral
-            )
-
-            bg_estado, fg_estado = color_estado_corporal(resultado_corporal["estado"])
-
-            st.markdown(
-                f"""
-                <div class="result-card" style="background-color:{bg_estado}; color:{fg_estado};">
-                    Diagnóstico corporal: {resultado_corporal["estado"]}
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
-
-            col_r1, col_r2, col_r3 = st.columns(3)
-            with col_r1:
-                st.write(f"**IMC:** {resultado_corporal['imc'] if resultado_corporal['imc'] is not None else '-'}")
-                st.write(f"**Clasificación IMC:** {resultado_corporal['clasif_imc']}")
-                st.write(f"**% grasa:** {resultado_corporal['clasif_grasa']}")
-
-            with col_r2:
-                st.write(f"**% agua corporal:** {resultado_corporal['clasif_agua']}")
-                st.write(f"**Grasa visceral:** {resultado_corporal['clasif_visceral']}")
-                st.write(f"**Músculo relativo %:** {resultado_corporal['musculo_rel_pct'] if resultado_corporal['musculo_rel_pct'] is not None else '-'}")
-
-            with col_r3:
-                st.write(f"**Clasificación muscular:** {resultado_corporal['clasif_musculo']}")
-                st.write(f"**Metabolismo basal:** {metabolismo if metabolismo is not None else '-'}")
-                st.write(f"**Sexo de referencia:** {sexo_corporal.capitalize() if sexo_corporal else '-'}")
-
-            motivos_texto = resultado_corporal["motivos"] if resultado_corporal["motivos"] else ["Sin hallazgos relevantes"]
-            motivos_html = "".join([f"<li>{m}</li>" for m in motivos_texto])
-
-            st.markdown(
-                f"""
-                <div class="motivo-box">
-                    <b>Motivos:</b>
-                    <ul style="margin-top:8px; margin-bottom:0;">
-                        {motivos_html}
-                    </ul>
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
-
-            st.markdown(
-                f"""
-                <div class="reco-box">
-                    <b>Sugerencia:</b><br>
-                    {resultado_corporal["recomendacion"]}
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
-
-            bc1, bc2 = st.columns(2)
-
-            with bc1:
-                if st.button("Guardar composición corporal", key=f"guardar_inbody_{paciente_id}"):
-                    try:
-                        guardar_inbody(
-                            paciente_id=paciente_id,
-                            fecha_estudio=fecha_inbody,
-                            peso_kg=peso_inbody,
-                            talla_m=ficha["talla_m"],
-                            grasa_corporal_pct=grasa_pct,
-                            masa_muscular_kg=masa_muscular,
-                            agua_corporal_pct=agua_pct,
-                            grasa_visceral=grasa_visceral,
-                            metabolismo_basal=metabolismo,
-                            observaciones=observaciones_inbody
-                        )
-                        st.success("Composición corporal guardada correctamente")
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Error al guardar composición corporal: {e}")
-
-            with bc2:
-                if st.button(
-                    "Borrar última composición",
-                    key=f"btn_borrar_ultimo_inbody_{paciente_id}",
-                    disabled=ultimo_id_inbody is None
-                ):
-                    try:
-                        eliminar_registro_corporal(ultimo_id_inbody)
-                        st.success("Último registro corporal eliminado.")
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Error al borrar última composición: {e}")
-
-with fila2_col2:
-    st.markdown("### Medicación")
-
-    with st.container(border=True):
-        fecha_cambio = st.date_input(
-            "Fecha de cambio",
-            value=date.today(),
-            key=f"med_fecha_{paciente_id}"
-        )
-
-        col_m1, col_m2 = st.columns(2)
-
-        with col_m1:
-            droga = st.text_input("Droga", key=f"med_droga_{paciente_id}")
-            dosis = st.number_input(
-                "Dosis",
-                min_value=0.0,
-                max_value=99999.0,
-                step=0.1,
-                format="%.2f",
-                key=f"med_dosis_{paciente_id}"
-            )
-            unidad = st.text_input(
-                "Unidad",
-                placeholder="mg / mcg / ml / comprimidos",
-                key=f"med_unidad_{paciente_id}"
-            )
-
-        with col_m2:
-            frecuencia = st.text_input(
-                "Frecuencia",
-                placeholder="Cada 24 h / Cada 12 h",
-                key=f"med_frecuencia_{paciente_id}"
-            )
-            via_administracion = st.selectbox(
-                "Vía de administración",
-                ["Oral", "Subcutánea", "Intravenosa", "Intramuscular", "Tópica", "Inhalatoria", "Otra"],
-                key=f"med_via_{paciente_id}"
-            )
-            estado_medicacion = st.selectbox(
-                "Estado",
-                ["Activa", "Modificada", "Suspendida"],
-                key=f"med_estado_{paciente_id}"
-            )
-
-        observaciones_medicacion = st.text_area(
-            "Observaciones",
-            key=f"med_obs_{paciente_id}",
-            height=80
-        )
-
-        if st.button("Guardar medicación", key=f"btn_guardar_medicacion_{paciente_id}"):
             try:
-                guardar_medicacion(
+                guardar_evaluacion(
                     paciente_id=paciente_id,
-                    fecha_cambio=fecha_cambio,
-                    droga=droga,
-                    dosis=dosis,
-                    unidad=unidad,
-                    frecuencia=frecuencia,
-                    via_administracion=via_administracion,
-                    estado=estado_medicacion,
-                    observaciones=observaciones_medicacion
+                    paciente_nombre=paciente_nombre,
+                    sexo=sexo,
+                    edad=edad,
+                    prueba=prueba,
+                    valor_medido=valor_medido,
+                    percentil=percentil,
+                    clasificacion=clasificacion
                 )
-                st.success("Medicación guardada correctamente.")
+                st.success("Evaluación guardada correctamente.")
                 st.rerun()
             except Exception as e:
-                st.error(f"Error al guardar medicación: {e}")
+                st.error(f"Error al guardar: {e}")
 
-        st.markdown("#### Historial de medicación")
+st.markdown("### Composición corporal")
 
-        df_medicacion = df_medicacion_export.copy()
+with st.container(border=True):
+    if ficha["talla_m"] is None or float(ficha["talla_m"]) <= 0:
+        st.warning("Para cargar composición corporal primero hay que tener una talla válida en el paciente.")
+    else:
+        sexo_corporal = str(ficha["sexo"]).strip().lower()
 
-        if not df_medicacion.empty:
-            if "fecha_cambio" in df_medicacion.columns:
-                df_medicacion["fecha_cambio"] = pd.to_datetime(df_medicacion["fecha_cambio"], errors="coerce")
-                df_medicacion = df_medicacion.sort_values("fecha_cambio", ascending=False)
-                df_medicacion["fecha_cambio"] = df_medicacion["fecha_cambio"].dt.strftime("%Y-%m-%d")
+        col_c1, col_c2 = st.columns(2)
 
-            columnas_medicacion = [
-                "fecha_cambio",
-                "droga",
-                "dosis",
-                "unidad",
-                "frecuencia",
-                "via_administracion",
-                "estado",
-                "observaciones"
-            ]
-            columnas_medicacion = [c for c in columnas_medicacion if c in df_medicacion.columns]
+        with col_c1:
+            fecha_inbody = st.date_input("Fecha estudio", value=date.today(), key=f"inbody_fecha_{paciente_id}")
+            peso_inbody = st.number_input("Peso (kg)", min_value=0.0, max_value=300.0, step=0.1, key=f"inbody_peso_{paciente_id}")
+            imc_inbody_calc = round(float(peso_inbody) / (float(ficha["talla_m"]) ** 2), 2) if peso_inbody and ficha["talla_m"] else 0.0
+            st.markdown(f"**IMC calculado:** {imc_inbody_calc:.2f}")
+            grasa_pct = st.number_input("% grasa corporal", min_value=0.0, max_value=80.0, step=0.1, key=f"inbody_grasa_{paciente_id}")
 
-            st.dataframe(
-                df_medicacion[columnas_medicacion],
-                use_container_width=True,
-                hide_index=True,
-                height=220
+        with col_c2:
+            masa_muscular = st.number_input("Masa muscular (kg)", min_value=0.0, max_value=100.0, step=0.1, key=f"inbody_musculo_{paciente_id}")
+            agua_pct = st.number_input("% agua corporal", min_value=0.0, max_value=100.0, step=0.1, key=f"inbody_agua_{paciente_id}")
+            grasa_visceral = st.number_input("Grasa visceral", min_value=0.0, max_value=30.0, step=0.1, key=f"inbody_visceral_{paciente_id}")
+            metabolismo = st.number_input("Metabolismo basal", min_value=0.0, max_value=4000.0, step=10.0, key=f"inbody_metabolismo_{paciente_id}")
+
+        observaciones_inbody = st.text_area("Observaciones", key=f"inbody_obs_{paciente_id}", height=80)
+
+        resultado_corporal = evaluar_perfil_morfofuncional(
+            sexo=sexo_corporal,
+            peso_kg=peso_inbody,
+            talla_m=ficha["talla_m"],
+            grasa_pct=grasa_pct,
+            masa_muscular_kg=masa_muscular,
+            agua_pct=agua_pct,
+            grasa_visceral=grasa_visceral
+        )
+
+        bg_estado, fg_estado = color_estado_corporal(resultado_corporal["estado"])
+
+        st.markdown(
+            f"""
+            <div class="result-card" style="background-color:{bg_estado}; color:{fg_estado};">
+                Diagnóstico corporal: {resultado_corporal["estado"]}
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+        col_r1, col_r2, col_r3 = st.columns(3)
+        with col_r1:
+            st.write(f"**IMC:** {resultado_corporal['imc'] if resultado_corporal['imc'] is not None else '-'}")
+            st.write(f"**Clasificación IMC:** {resultado_corporal['clasif_imc']}")
+            st.write(f"**% grasa:** {resultado_corporal['clasif_grasa']}")
+
+        with col_r2:
+            st.write(f"**% agua corporal:** {resultado_corporal['clasif_agua']}")
+            st.write(f"**Grasa visceral:** {resultado_corporal['clasif_visceral']}")
+            st.write(f"**Músculo relativo %:** {resultado_corporal['musculo_rel_pct'] if resultado_corporal['musculo_rel_pct'] is not None else '-'}")
+
+        with col_r3:
+            st.write(f"**Clasificación muscular:** {resultado_corporal['clasif_musculo']}")
+            st.write(f"**Metabolismo basal:** {metabolismo if metabolismo is not None else '-'}")
+            st.write(f"**Sexo de referencia:** {sexo_corporal.capitalize() if sexo_corporal else '-'}")
+
+        motivos_texto = resultado_corporal["motivos"] if resultado_corporal["motivos"] else ["Sin hallazgos relevantes"]
+        motivos_html = "".join([f"<li>{m}</li>" for m in motivos_texto])
+
+        st.markdown(
+            f"""
+            <div class="motivo-box">
+                <b>Motivos:</b>
+                <ul style="margin-top:8px; margin-bottom:0;">
+                    {motivos_html}
+                </ul>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+        st.markdown(
+            f"""
+            <div class="reco-box">
+                <b>Sugerencia:</b><br>
+                {resultado_corporal["recomendacion"]}
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+        bc1, bc2 = st.columns(2)
+
+        with bc1:
+            if st.button("Guardar composición corporal", key=f"guardar_inbody_{paciente_id}"):
+                try:
+                    guardar_inbody(
+                        paciente_id=paciente_id,
+                        fecha_estudio=fecha_inbody,
+                        peso_kg=peso_inbody,
+                        talla_m=ficha["talla_m"],
+                        grasa_corporal_pct=grasa_pct,
+                        masa_muscular_kg=masa_muscular,
+                        agua_corporal_pct=agua_pct,
+                        grasa_visceral=grasa_visceral,
+                        metabolismo_basal=metabolismo,
+                        observaciones=observaciones_inbody
+                    )
+                    st.success("Composición corporal guardada correctamente")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error al guardar composición corporal: {e}")
+
+        with bc2:
+            if st.button(
+                "Borrar última composición",
+                key=f"btn_borrar_ultimo_inbody_{paciente_id}",
+                disabled=ultimo_id_inbody is None
+            ):
+                try:
+                    eliminar_registro_corporal(ultimo_id_inbody)
+                    st.success("Último registro corporal eliminado.")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error al borrar última composición: {e}")
+
+# =========================================================
+# MEDICACIÓN
+# =========================================================
+st.markdown("### Medicación")
+
+with st.container(border=True):
+    fecha_cambio = st.date_input(
+        "Fecha de cambio",
+        value=date.today(),
+        key=f"med_fecha_{paciente_id}"
+    )
+
+    col_m1, col_m2 = st.columns(2)
+
+    with col_m1:
+        droga = st.text_input("Droga", key=f"med_droga_{paciente_id}")
+        dosis = st.number_input(
+            "Dosis",
+            min_value=0.0,
+            max_value=99999.0,
+            step=0.1,
+            format="%.2f",
+            key=f"med_dosis_{paciente_id}"
+        )
+        unidad = st.text_input(
+            "Unidad",
+            placeholder="mg / mcg / ml / comprimidos",
+            key=f"med_unidad_{paciente_id}"
+        )
+
+    with col_m2:
+        frecuencia = st.text_input(
+            "Frecuencia",
+            placeholder="Cada 24 h / Cada 12 h",
+            key=f"med_frecuencia_{paciente_id}"
+        )
+        via_administracion = st.selectbox(
+            "Vía de administración",
+            ["Oral", "Subcutánea", "Intravenosa", "Intramuscular", "Tópica", "Inhalatoria", "Otra"],
+            key=f"med_via_{paciente_id}"
+        )
+        estado_medicacion = st.selectbox(
+            "Estado",
+            ["Activa", "Modificada", "Suspendida"],
+            key=f"med_estado_{paciente_id}"
+        )
+
+    observaciones_medicacion = st.text_area(
+        "Observaciones",
+        key=f"med_obs_{paciente_id}",
+        height=80
+    )
+
+    if st.button("Guardar medicación", key=f"btn_guardar_medicacion_{paciente_id}"):
+        try:
+            guardar_medicacion(
+                paciente_id=paciente_id,
+                fecha_cambio=fecha_cambio,
+                droga=droga,
+                dosis=dosis,
+                unidad=unidad,
+                frecuencia=frecuencia,
+                via_administracion=via_administracion,
+                estado=estado_medicacion,
+                observaciones=observaciones_medicacion
             )
-        else:
-            st.info("Sin historial de medicación.")
+            st.success("Medicación guardada correctamente.")
+            st.rerun()
+        except Exception as e:
+            st.error(f"Error al guardar medicación: {e}")
+
+    st.markdown("#### Historial de medicación")
+
+    df_medicacion = df_medicacion_export.copy()
+
+    if not df_medicacion.empty:
+        if "fecha_cambio" in df_medicacion.columns:
+            df_medicacion["fecha_cambio"] = pd.to_datetime(df_medicacion["fecha_cambio"], errors="coerce")
+            df_medicacion = df_medicacion.sort_values("fecha_cambio", ascending=False)
+            df_medicacion["fecha_cambio"] = df_medicacion["fecha_cambio"].dt.strftime("%Y-%m-%d")
+
+        columnas_medicacion = [
+            "fecha_cambio",
+            "droga",
+            "dosis",
+            "unidad",
+            "frecuencia",
+            "via_administracion",
+            "estado",
+            "observaciones"
+        ]
+        columnas_medicacion = [c for c in columnas_medicacion if c in df_medicacion.columns]
+
+        st.dataframe(
+            df_medicacion[columnas_medicacion],
+            use_container_width=True,
+            hide_index=True,
+            height=220
+        )
+    else:
+        st.info("Sin historial de medicación.")
 
 st.divider()
 filtro_historial_global = "Todas"
