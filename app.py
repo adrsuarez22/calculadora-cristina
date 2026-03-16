@@ -2008,6 +2008,12 @@ def calcular_resultado(prueba, sexo, edad, altura, valor_medido):
 # =========================================================
 # UI
 # =========================================================
+pacientes = obtener_pacientes()
+
+if not pacientes:
+    st.warning("No hay pacientes cargados.")
+    st.stop()
+
 st.title("Calculadora de Condición Física")
 
 col_alta_btn_1, col_alta_btn_2 = st.columns([1, 5])
@@ -2049,12 +2055,35 @@ if st.session_state["mostrar_form_nuevo_paciente"]:
                     st.warning("Ingresá el nombre del paciente.")
                 else:
                     try:
-                        guardar_paciente(
+                        resp_nuevo_paciente = guardar_paciente(
                             nombre=nuevo_nombre,
                             sexo=nuevo_sexo,
                             fecha_nacimiento=nueva_fecha_nacimiento,
                             talla_m=nueva_talla
                         )
+
+                        nuevo_paciente_id = None
+                        if getattr(resp_nuevo_paciente, "data", None):
+                            try:
+                                nuevo_paciente_id = int(resp_nuevo_paciente.data[0]["id"])
+                            except Exception:
+                                nuevo_paciente_id = None
+
+                        if nuevo_paciente_id is None:
+                            pacientes_actualizados = obtener_pacientes()
+                            for p in pacientes_actualizados:
+                                if str(p.get("nombre", "")).strip().lower() == nuevo_nombre.strip().lower():
+                                    nuevo_paciente_id = p.get("id")
+                                    break
+
+                        st.session_state["mostrar_form_nuevo_paciente"] = False
+                        st.session_state["busqueda_paciente"] = ""
+                        st.session_state["paciente_id_seleccionado"] = nuevo_paciente_id
+                        st.session_state["paciente_cargado_id"] = None
+
+                        resetear_form_nuevo_paciente()
+                        resetear_pruebas_funcionales()
+
                         st.success("Paciente agregado correctamente.")
                         st.rerun()
                     except Exception as e:
@@ -2075,41 +2104,57 @@ with top1:
 
     busqueda_paciente = st.text_input(
         "Buscar paciente",
-        value="",
         placeholder="Escribí nombre o parte del nombre...",
         key="busqueda_paciente"
     )
 
-    pacientes_filtrados = [
-        p for p in pacientes
-        if busqueda_paciente.strip().lower() in str(p["nombre"]).strip().lower()
-    ]
+    busqueda_normalizada = busqueda_paciente.strip().lower()
+
+    if busqueda_normalizada:
+        pacientes_filtrados = [
+            p for p in pacientes
+            if busqueda_normalizada in str(p.get("nombre", "")).strip().lower()
+        ]
+    else:
+        pacientes_filtrados = pacientes
+
+    if not pacientes_filtrados:
+        st.warning("No se encontraron pacientes con esa búsqueda.")
+        st.stop()
+
+    paciente_id_preseleccionado = st.session_state.get("paciente_id_seleccionado")
 
     etiquetas = []
+    mapa_etiqueta_id = {}
 
     for p in pacientes_filtrados:
         etiqueta = f"{p['nombre']} | ID {p['id']}"
 
-        if "fecha_nacimiento" in p and p["fecha_nacimiento"]:
+        if p.get("fecha_nacimiento"):
             etiqueta += f" | Nac: {p['fecha_nacimiento']}"
 
         etiquetas.append(etiqueta)
+        mapa_etiqueta_id[etiqueta] = p["id"]
 
-    if not etiquetas:
-        st.warning("No se encontraron pacientes con esa búsqueda.")
-        st.stop()
+    indice_default = 0
+    if paciente_id_preseleccionado is not None:
+        for i, p in enumerate(pacientes_filtrados):
+            if p.get("id") == paciente_id_preseleccionado:
+                indice_default = i
+                break
 
     seleccion = st.selectbox(
         "Seleccionar paciente",
-        etiquetas 
+        etiquetas,
+        index=indice_default,
+        key="selector_paciente"
     )
 
-    indice = etiquetas.index(seleccion)
-
-    paciente_actual = pacientes_filtrados[indice]
-    paciente_id = paciente_actual["id"]
+    paciente_id = mapa_etiqueta_id[seleccion]
+    paciente_actual = next(p for p in pacientes_filtrados if p["id"] == paciente_id)
     paciente_nombre = paciente_actual["nombre"]
 
+    st.session_state["paciente_id_seleccionado"] = paciente_id
 
 with top4:
     st.markdown("###")
@@ -2127,6 +2172,9 @@ with top4:
         else:
             try:
                 eliminar_paciente(paciente_id)
+                st.session_state["paciente_id_seleccionado"] = None
+                st.session_state["paciente_cargado_id"] = None
+                st.session_state["busqueda_paciente"] = ""
                 st.success("Paciente eliminado correctamente.")
                 st.rerun()
 
@@ -2140,6 +2188,9 @@ df_peso_export = obtener_historial_peso(paciente_id) if paciente_id is not None 
 df_inbody_export = obtener_historial_inbody(paciente_id) if paciente_id is not None else pd.DataFrame()
 df_eval_export = obtener_historial_paciente(paciente_id) if paciente_id is not None else pd.DataFrame()
 df_medicacion_export = obtener_historial_medicacion(paciente_id) if paciente_id is not None else pd.DataFrame()
+
+if st.session_state.get("paciente_cargado_id") != paciente_id:
+    cargar_datos_paciente_en_widgets(paciente_actual, df_peso_export)
 
 ficha = construir_ficha_paciente(paciente_actual, df_eval_export)
 
