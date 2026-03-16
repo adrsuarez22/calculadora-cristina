@@ -2010,49 +2010,61 @@ def calcular_resultado(prueba, sexo, edad, altura, valor_medido):
 # =========================================================
 st.title("Calculadora de Condición Física")
 
-with st.expander("➕ Nuevo paciente"):
-    nuevo_nombre = st.text_input("Nombre del nuevo paciente", key="nuevo_nombre_alta")
-    nuevo_sexo = st.selectbox("Sexo del nuevo paciente", ["hombre", "mujer"], key="nuevo_sexo_alta")
-    nueva_fecha_nacimiento = st.date_input(
-        "Fecha de nacimiento",
-        value=date(1970, 1, 1),
-        min_value=date(1920, 1, 1),
-        max_value=date.today(),
-        format="DD/MM/YYYY",
-        key="nueva_fecha_nacimiento_alta"
-    )
-    nueva_talla = st.number_input(
-        "Talla (m)",
-        min_value=0.50,
-        max_value=2.50,
-        value=1.70,
-        step=0.01,
-        format="%.2f",
-        key="nueva_talla_alta"
-    )
+col_alta_btn_1, col_alta_btn_2 = st.columns([1, 5])
 
-    if st.button("Guardar paciente", key="btn_guardar_paciente"):
-        if not nuevo_nombre.strip():
-            st.warning("Ingresá el nombre del paciente.")
-        else:
-            try:
-                guardar_paciente(
-                    nombre=nuevo_nombre,
-                    sexo=nuevo_sexo,
-                    fecha_nacimiento=nueva_fecha_nacimiento,
-                    talla_m=nueva_talla
-                )
-                st.success("Paciente agregado correctamente.")
+with col_alta_btn_1:
+    if st.button("➕ Nuevo paciente", key="btn_mostrar_form_nuevo_paciente"):
+        st.session_state["mostrar_form_nuevo_paciente"] = True
+
+with col_alta_btn_2:
+    if st.session_state["mostrar_form_nuevo_paciente"]:
+        st.info("Completá los datos y guardá. Después vamos a hacer que se cierre solo al guardar.")
+
+if st.session_state["mostrar_form_nuevo_paciente"]:
+    with st.expander("➕ Nuevo paciente", expanded=True):
+        nuevo_nombre = st.text_input("Nombre del nuevo paciente", key="nuevo_nombre_alta")
+        nuevo_sexo = st.selectbox("Sexo del nuevo paciente", ["hombre", "mujer"], key="nuevo_sexo_alta")
+        nueva_fecha_nacimiento = st.date_input(
+            "Fecha de nacimiento",
+            value=st.session_state.get("nueva_fecha_nacimiento_alta", date(1970, 1, 1)),
+            min_value=date(1920, 1, 1),
+            max_value=date.today(),
+            format="DD/MM/YYYY",
+            key="nueva_fecha_nacimiento_alta"
+        )
+        nueva_talla = st.number_input(
+            "Talla (m)",
+            min_value=0.50,
+            max_value=2.50,
+            step=0.01,
+            format="%.2f",
+            key="nueva_talla_alta"
+        )
+
+        col_guardar_paciente, col_cancelar_paciente = st.columns(2)
+
+        with col_guardar_paciente:
+            if st.button("Guardar paciente", key="btn_guardar_paciente"):
+                if not nuevo_nombre.strip():
+                    st.warning("Ingresá el nombre del paciente.")
+                else:
+                    try:
+                        guardar_paciente(
+                            nombre=nuevo_nombre,
+                            sexo=nuevo_sexo,
+                            fecha_nacimiento=nueva_fecha_nacimiento,
+                            talla_m=nueva_talla
+                        )
+                        st.success("Paciente agregado correctamente.")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Error al guardar paciente: {e}")
+
+        with col_cancelar_paciente:
+            if st.button("Cancelar", key="btn_cancelar_nuevo_paciente"):
+                st.session_state["mostrar_form_nuevo_paciente"] = False
+                resetear_form_nuevo_paciente()
                 st.rerun()
-            except Exception as e:
-                st.error(f"Error al guardar paciente: {e}")
-
-pacientes = obtener_pacientes()
-opciones_pacientes = [p["nombre"] for p in pacientes]
-
-if not opciones_pacientes:
-    st.warning("No hay pacientes cargados. Agregá uno desde '➕ Nuevo paciente'.")
-    st.stop()
 
 # =========================================================
 # ENCABEZADO
