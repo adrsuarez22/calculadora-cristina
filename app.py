@@ -2616,7 +2616,7 @@ if not pacientes:
     st.stop()
 
 st.title("Método Dra. Petratti")
-st.caption("Evaluación clínica de condición física y riesgo cardiometabólico")
+st.markdown("<div class="section-subtitle">Evaluación clínica de condición física y riesgo cardiometabólico</div>", unsafe_allow_html=True)
 
 col_alta_btn_1, col_alta_btn_2 = st.columns([1, 5])
 
