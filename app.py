@@ -2419,10 +2419,17 @@ def generar_informe_integrado_paciente(ficha, df_peso, df_inbody, df_eval, df_me
 
     percentiles_validos = []
     clasificaciones_funcionales = []
+    percentiles_funcionales = {
+        "Caminata 6 minutos": None,
+        "Prensión manual": None,
+        "Levantarse de la silla": None
+    }
 
-    for row in ultimos_funcionales.values():
+    for prueba, row in ultimos_funcionales.items():
         if pd.notna(row.get("percentil")):
-            percentiles_validos.append(float(row.get("percentil")))
+            percentil_valor = float(row.get("percentil"))
+            percentiles_validos.append(percentil_valor)
+            percentiles_funcionales[prueba] = round(percentil_valor, 1)
         if pd.notna(row.get("clasificacion")):
             clasificaciones_funcionales.append(str(row.get("clasificacion")))
 
@@ -2493,6 +2500,7 @@ def generar_informe_integrado_paciente(ficha, df_peso, df_inbody, df_eval, df_me
         "estado_corporal": estado_corporal,
         "peor_percentil": peor_percentil,
         "promedio_percentil": promedio_percentil,
+        "percentiles_funcionales": percentiles_funcionales,
         "comentario_unificado": comentario_unificado,
         "recomendacion_final": recomendacion_final,
         "tabla_resumen": df_resumen
@@ -3634,15 +3642,15 @@ ii1, ii2, ii3 = st.columns(3)
 with ii1:
     with st.container(border=True):
         st.markdown("#### Funcional")
-        if informe_integrado["promedio_percentil"] is not None:
-            st.write(f"**Promedio percentilar:** P{informe_integrado['promedio_percentil']}")
-        else:
-            st.write("**Promedio percentilar:** -")
+        percentiles_funcionales = informe_integrado.get("percentiles_funcionales", {})
 
-        if informe_integrado["peor_percentil"] is not None:
-            st.write(f"**Peor percentil:** P{round(informe_integrado['peor_percentil'], 1)}")
-        else:
-            st.write("**Peor percentil:** -")
+        p_caminata = percentiles_funcionales.get("Caminata 6 minutos")
+        p_prension = percentiles_funcionales.get("Prensión manual")
+        p_silla = percentiles_funcionales.get("Levantarse de la silla")
+
+        st.write(f"**Caminata 6 min:** {f'P{p_caminata}' if p_caminata is not None else '-'}")
+        st.write(f"**Prensión manual:** {f'P{p_prension}' if p_prension is not None else '-'}")
+        st.write(f"**Levantarse silla:** {f'P{p_silla}' if p_silla is not None else '-'}")
 
 with ii2:
     with st.container(border=True):
