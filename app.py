@@ -2646,11 +2646,15 @@ with top1:
 
     etiqueta_preseleccionada = etiquetas[indice_default] if etiquetas else None
 
-    if etiqueta_preseleccionada is not None:
-        if st.session_state.get("selector_paciente") not in etiquetas:
-            st.session_state["selector_paciente"] = etiqueta_preseleccionada
-        elif paciente_id_preseleccionado is not None or paciente_nombre_pendiente:
-            st.session_state["selector_paciente"] = etiqueta_preseleccionada
+    if st.session_state.get("selector_paciente") not in etiquetas and etiqueta_preseleccionada is not None:
+        st.session_state["selector_paciente"] = etiqueta_preseleccionada
+
+    if paciente_nombre_pendiente:
+        for etiqueta in etiquetas:
+            if paciente_nombre_pendiente == str(etiqueta).split(" | ID ")[0].strip().lower():
+                st.session_state["selector_paciente"] = etiqueta
+                st.session_state["paciente_nombre_pendiente"] = None
+                break
 
     seleccion = st.selectbox(
         "Seleccionar paciente",
@@ -2664,7 +2668,6 @@ with top1:
     paciente_nombre = paciente_actual["nombre"]
 
     st.session_state["paciente_id_seleccionado"] = paciente_id
-    st.session_state["paciente_nombre_pendiente"] = None
 
 with top4:
     st.markdown("###")
