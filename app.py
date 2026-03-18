@@ -139,7 +139,7 @@ st.set_page_config(
 st.markdown("""
 <style>
 [data-testid="stAppViewContainer"] {
-    background-color: #f7f8fa;
+    background: linear-gradient(180deg, #f7f8fa 0%, #f3f5f9 100%);
 }
 
 [data-testid="stHeader"] {
@@ -151,34 +151,134 @@ st.markdown("""
 }
 
 .block-container {
-    padding-top: 1.5rem;
-    padding-bottom: 2rem;
-    max-width: 1400px;
+    padding-top: 1.7rem;
+    padding-bottom: 2.2rem;
+    max-width: 1480px;
+}
+
+h1, h2, h3 {
+    letter-spacing: -0.02em;
+    color: #101828;
+}
+
+h1 {
+    font-size: 2.55rem !important;
+    margin-bottom: 0.15rem !important;
+}
+
+h2 {
+    font-size: 2.05rem !important;
+    margin-top: 0.35rem !important;
+}
+
+h3 {
+    font-size: 1.62rem !important;
+    margin-top: 0.2rem !important;
+}
+
+label, .stMarkdown p, .stCaption, .stTextInput label, .stNumberInput label, .stDateInput label, .stSelectbox label, .stCheckbox label {
+    font-size: 1.08rem !important;
+}
+
+p, li {
+    line-height: 1.55 !important;
+}
+
+.stButton button, .stDownloadButton button {
+    font-size: 1rem !important;
+    font-weight: 600 !important;
+    border-radius: 10px !important;
+    padding: 0.52rem 1rem !important;
 }
 
 .result-card {
-    padding: 14px 16px;
-    border-radius: 10px;
-    font-size: 18px;
-    font-weight: 700;
+    padding: 15px 18px;
+    border-radius: 12px;
+    font-size: 19px;
+    font-weight: 800;
     margin-top: 8px;
+    margin-bottom: 12px;
+    box-shadow: 0 6px 18px rgba(16, 24, 40, 0.08);
+}
+
+.soft-card {
+    background: #ffffff;
+    border: 1px solid #e6e9ef;
+    border-radius: 14px;
+    padding: 18px 18px 16px 18px;
+    box-shadow: 0 6px 18px rgba(16, 24, 40, 0.05);
+    min-height: 156px;
+    margin-bottom: 8px;
+}
+
+.soft-card-title {
+    font-size: 16px;
+    font-weight: 800;
+    color: #344054;
     margin-bottom: 10px;
+}
+
+.soft-card-value {
+    font-size: 29px;
+    font-weight: 800;
+    color: #101828;
+    line-height: 1.1;
+    margin-bottom: 8px;
+}
+
+.soft-card-meta {
+    font-size: 15.5px;
+    color: #475467;
+    line-height: 1.62;
+}
+
+.section-subtle {
+    font-size: 15.5px;
+    color: #667085;
+    margin-top: -1px;
+    margin-bottom: 14px;
+}
+
+.table-caption {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #344054;
+    margin-bottom: 0.4rem;
 }
 
 .motivo-box {
     background-color: #ffffff;
     border: 1px solid #e6e9ef;
-    border-radius: 10px;
-    padding: 12px 14px;
+    border-radius: 12px;
+    padding: 14px 16px;
     margin-bottom: 12px;
+    box-shadow: 0 4px 12px rgba(16, 24, 40, 0.04);
 }
 
 .reco-box {
     background-color: #eef7ef;
     border: 1px solid #d4ead7;
-    border-radius: 10px;
-    padding: 12px 14px;
+    border-radius: 12px;
+    padding: 14px 16px;
     margin-bottom: 14px;
+    box-shadow: 0 4px 12px rgba(16, 24, 40, 0.04);
+}
+
+div[data-testid="stDataFrame"] [role="columnheader"] {
+    background: #eef2f7 !important;
+    color: #344054 !important;
+    font-weight: 700 !important;
+    font-size: 0.98rem !important;
+}
+
+div[data-testid="stDataFrame"] [role="gridcell"] {
+    font-size: 0.98rem !important;
+}
+
+div[data-testid="stDataFrame"] {
+    border: 1px solid #d8dee8 !important;
+    border-radius: 12px !important;
+    overflow: hidden !important;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -2516,7 +2616,7 @@ if not pacientes:
     st.stop()
 
 st.title("Método Dra. Petratti")
-st.caption("Evaluación clínica de condición física y riesgo cardiometabólico")
+st.markdown("<div class="section-subtitle">Evaluación clínica de condición física y riesgo cardiometabólico</div>", unsafe_allow_html=True)
 
 col_alta_btn_1, col_alta_btn_2 = st.columns([1, 5])
 
@@ -2766,62 +2866,114 @@ st.divider()
 # =========================================================
 # TARJETAS RESUMEN
 # =========================================================
+
 k1, k2, k3, k4 = st.columns(4)
 
+peso_card_valor = "-"
+peso_card_meta = "Sin registros"
+imc_card_meta = "-"
+riesgo_card_meta = "-"
+
+if not df_peso_export.empty:
+    df_peso_tmp = df_peso_export.copy()
+    df_peso_tmp["fecha"] = pd.to_datetime(df_peso_tmp["fecha"], errors="coerce")
+    df_peso_tmp = df_peso_tmp.dropna(subset=["fecha"]).sort_values("fecha", ascending=False)
+
+    if not df_peso_tmp.empty:
+        ultimo_peso = df_peso_tmp.iloc[0]
+        peso_card_valor = f"{float(ultimo_peso['peso_kg']):.1f} kg"
+        peso_card_meta = f"Fecha: {ultimo_peso['fecha'].strftime('%d-%m-%Y')}"
+        imc_card_meta = f"IMC: {float(ultimo_peso['imc']):.2f}" if pd.notna(ultimo_peso.get("imc")) else "IMC: -"
+
+        partes_riesgo = []
+        if pd.notna(ultimo_peso.get("icc")):
+            partes_riesgo.append(f"ICC: {float(ultimo_peso['icc']):.2f}")
+        if pd.notna(ultimo_peso.get("ica")):
+            partes_riesgo.append(f"ICA: {float(ultimo_peso['ica']):.2f}")
+        riesgo_card_meta = " | ".join(partes_riesgo) if partes_riesgo else "-"
+
+estado_corporal_card = "Sin registros"
+estado_corporal_meta_1 = "Grasa: -"
+estado_corporal_meta_2 = "Músculo: -"
+
+if not df_inbody_export.empty and ficha["talla_m"] is not None:
+    df_corporal_tmp = enriquecer_historial_corporal(
+        df_inbody_export,
+        str(ficha["sexo"]).strip().lower(),
+        ficha["talla_m"]
+    )
+    df_corporal_tmp["fecha"] = pd.to_datetime(df_corporal_tmp["fecha"], errors="coerce")
+    df_corporal_tmp = df_corporal_tmp.dropna(subset=["fecha"]).sort_values("fecha", ascending=False)
+
+    if not df_corporal_tmp.empty:
+        ultimo_corporal = df_corporal_tmp.iloc[0]
+        estado_corporal_card = str(ultimo_corporal.get("diagnostico_corporal", "Sin registros"))
+        estado_corporal_meta_1 = f"Grasa: {ultimo_corporal.get('clasif_grasa', '-')}"
+        estado_corporal_meta_2 = f"Músculo: {ultimo_corporal.get('clasif_musculo', '-')}"
+
+ultima_eval_card = ficha["ultima_clasificacion"] if ficha["ultima_clasificacion"] != "-" else "Sin datos"
+ultima_eval_meta_1 = f"Fecha: {ficha['ultima_fecha']}"
+ultima_eval_meta_2 = f"Prueba: {ficha['ultima_prueba']}"
+
 with k1:
-    with st.container(border=True):
-        st.markdown("#### Paciente")
-        st.write(f"**Nombre:** {ficha['nombre']}")
-        st.write(f"**Sexo:** {str(ficha['sexo']).capitalize() if ficha['sexo'] != '-' else '-'}")
-        if ficha["talla_m"] is not None:
-            st.write(f"**Talla:** {float(ficha['talla_m']):.2f} m")
-        else:
-            st.write("**Talla:** -")
+    st.markdown(
+        f"""
+        <div class="soft-card">
+            <div class="soft-card-title">Paciente</div>
+            <div class="soft-card-value">{ficha['nombre']}</div>
+            <div class="soft-card-meta">
+                Sexo: {str(ficha['sexo']).capitalize() if ficha['sexo'] != '-' else '-'}<br>
+                Talla: {f"{float(ficha['talla_m']):.2f} m" if ficha['talla_m'] is not None else '-'}
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
 with k2:
-    with st.container(border=True):
-        st.markdown("#### Peso / IMC")
-        if not df_peso_export.empty:
-            df_peso_tmp = df_peso_export.copy()
-            df_peso_tmp["fecha"] = pd.to_datetime(df_peso_tmp["fecha"], errors="coerce")
-            df_peso_tmp = df_peso_tmp.dropna(subset=["fecha"]).sort_values("fecha", ascending=False)
-            ultimo_peso = df_peso_tmp.iloc[0]
-            st.write(f"**Peso:** {float(ultimo_peso['peso_kg']):.1f} kg")
-            st.write(f"**IMC:** {float(ultimo_peso['imc']):.2f}")
-            if pd.notna(ultimo_peso.get('icc')):
-                st.write(f"**ICC:** {float(ultimo_peso['icc']):.2f} ({clasificacion_icc(ficha['sexo'], ultimo_peso['icc'])})")
-            if pd.notna(ultimo_peso.get('ica')):
-                st.write(f"**ICA:** {float(ultimo_peso['ica']):.2f} ({clasificacion_ica(ultimo_peso['ica'])})")
-            st.write(f"**Fecha:** {ultimo_peso['fecha'].strftime('%d-%m-%Y')}")
-        else:
-            st.write("Sin registros")
+    st.markdown(
+        f"""
+        <div class="soft-card">
+            <div class="soft-card-title">Peso / IMC</div>
+            <div class="soft-card-value">{peso_card_valor}</div>
+            <div class="soft-card-meta">
+                {peso_card_meta}<br>
+                {imc_card_meta}
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
 with k3:
-    with st.container(border=True):
-        st.markdown("#### Estado corporal")
-        if not df_inbody_export.empty and ficha["talla_m"] is not None:
-            df_corporal_tmp = enriquecer_historial_corporal(
-                df_inbody_export,
-                str(ficha["sexo"]).strip().lower(),
-                ficha["talla_m"]
-            )
-            df_corporal_tmp["fecha"] = pd.to_datetime(df_corporal_tmp["fecha"], errors="coerce")
-            df_corporal_tmp = df_corporal_tmp.dropna(subset=["fecha"]).sort_values("fecha", ascending=False)
-            ultimo_corporal = df_corporal_tmp.iloc[0]
-
-            st.write(f"**Estado:** {ultimo_corporal.get('diagnostico_corporal', '-')}")
-            st.write(f"**Grasa:** {ultimo_corporal.get('clasif_grasa', '-')}")
-            st.write(f"**Músculo:** {ultimo_corporal.get('clasif_musculo', '-')}")
-        else:
-            st.write("Sin registros")
+    st.markdown(
+        f"""
+        <div class="soft-card">
+            <div class="soft-card-title">Estado corporal</div>
+            <div class="soft-card-value">{estado_corporal_card}</div>
+            <div class="soft-card-meta">
+                {estado_corporal_meta_1}<br>
+                {estado_corporal_meta_2}
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
 with k4:
-    with st.container(border=True):
-        st.markdown("#### Última evaluación")
-        st.write(f"**Fecha:** {ficha['ultima_fecha']}")
-        st.write(f"**Prueba:** {ficha['ultima_prueba']}")
-        st.write(f"**Clasificación:** {ficha['ultima_clasificacion']}")
-
+    st.markdown(
+        f"""
+        <div class="soft-card">
+            <div class="soft-card-title">Última evaluación</div>
+            <div class="soft-card-value">{ultima_eval_card}</div>
+            <div class="soft-card-meta">
+                {ultima_eval_meta_1}<br>
+                {ultima_eval_meta_2}
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 st.divider()
 
 
@@ -2829,6 +2981,7 @@ st.divider()
 # INGRESO DE DATOS
 # =========================================================
 st.markdown("## Ingreso de datos")
+st.markdown('<div class="section-subtle">Carga clínica, composición corporal y seguimiento funcional.</div>', unsafe_allow_html=True)
 
 # =========================================================
 # PESO E IMC
@@ -2926,6 +3079,7 @@ with col_peso_centro:
 
 
 st.markdown("#### Historial de peso / IMC")
+st.markdown('<div class="table-caption">Últimos registros antropométricos y de riesgo abdominal.</div>', unsafe_allow_html=True)
 
 df_peso_hist = df_peso_export.copy()
 
@@ -2933,7 +3087,15 @@ if not df_peso_hist.empty:
     df_peso_hist["fecha"] = pd.to_datetime(df_peso_hist["fecha"], errors="coerce")
     df_peso_hist = df_peso_hist.dropna(subset=["fecha"]).sort_values("fecha", ascending=False)
 
-    st.markdown("**Fecha | Peso | IMC | Cintura | Cadera | ICC | ICA | Eliminar**")
+    encabezado_1, encabezado_2, encabezado_3, encabezado_4, encabezado_5, encabezado_6, encabezado_7, encabezado_8 = st.columns([1.2, 0.9, 0.9, 0.9, 0.9, 0.8, 0.8, 0.5])
+    encabezado_1.markdown("**Fecha**")
+    encabezado_2.markdown("**Peso**")
+    encabezado_3.markdown("**IMC**")
+    encabezado_4.markdown("**Cintura**")
+    encabezado_5.markdown("**Cadera**")
+    encabezado_6.markdown("**ICC**")
+    encabezado_7.markdown("**ICA**")
+    encabezado_8.markdown("**Eliminar**")
 
     for _, row in df_peso_hist.iterrows():
         c1, c2, c3, c4, c5, c6, c7, c8 = st.columns([1.2, 0.9, 0.9, 0.9, 0.9, 0.8, 0.8, 0.5])
@@ -3018,6 +3180,7 @@ else:
 
 st.divider()
 st.markdown("### Evaluación funcional")
+st.markdown('<div class="section-subtle">Carga de pruebas funcionales con lectura percentilar e interpretación clínica.</div>', unsafe_allow_html=True)
 
 with st.container(border=True):
     sexo_paciente = str(paciente_actual.get("sexo", "")).strip().lower() if paciente_actual else ""
@@ -3173,6 +3336,7 @@ with st.container(border=True):
 
 
 st.markdown("#### Historial funcional")
+st.markdown('<div class="table-caption">Evaluaciones registradas con valor, percentil y clasificación.</div>', unsafe_allow_html=True)
 
 df_historial = df_eval_export.copy()
 
@@ -3339,6 +3503,7 @@ else:
 
 st.divider()
 st.markdown("### Composición corporal")
+st.markdown('<div class="section-subtle">Registro de composición corporal, diagnóstico morfofuncional y seguimiento evolutivo.</div>', unsafe_allow_html=True)
 
 with st.container(border=True):
     if ficha["talla_m"] is None or float(ficha["talla_m"]) <= 0:
@@ -3466,6 +3631,7 @@ with st.container(border=True):
 
 
 st.markdown("#### Historial corporal")
+st.markdown('<div class="table-caption">Últimos estudios de composición corporal y diagnóstico asociado.</div>', unsafe_allow_html=True)
 
 df_inbody = df_inbody_export.copy()
 if not df_inbody.empty:
@@ -3508,103 +3674,108 @@ else:
 
 st.divider()
 st.markdown("### Medicación")
+st.markdown('<div class="section-subtle">Registro terapéutico actual, cambios de dosis y seguimiento de la indicación clínica.</div>', unsafe_allow_html=True)
 
-with st.container(border=True):
-    fecha_cambio = st.date_input(
-        "Fecha de cambio",
-        value=date.today(),
-        key=f"med_fecha_{paciente_id}"
-    )
+col_med_ext_1, col_med_centro, col_med_ext_2 = st.columns([1.2, 3.6, 1.2])
 
-    col_m1, col_m2 = st.columns(2)
-
-    with col_m1:
-        droga = st.text_input("Droga", key=f"med_droga_{paciente_id}")
-        dosis = st.number_input(
-            "Dosis",
-            min_value=0.0,
-            max_value=99999.0,
-            step=0.1,
-            format="%.2f",
-            key=f"med_dosis_{paciente_id}"
-        )
-        unidad = st.text_input(
-            "Unidad",
-            placeholder="mg / mcg / ml / comprimidos",
-            key=f"med_unidad_{paciente_id}"
-        )
-
-    with col_m2:
-        frecuencia = st.text_input(
-            "Frecuencia",
-            placeholder="Cada 24 h / Cada 12 h",
-            key=f"med_frecuencia_{paciente_id}"
-        )
-        via_administracion = st.selectbox(
-            "Vía de administración",
-            ["Oral", "Subcutánea", "Intravenosa", "Intramuscular", "Tópica", "Inhalatoria", "Otra"],
-            key=f"med_via_{paciente_id}"
-        )
-        estado_medicacion = st.selectbox(
-            "Estado",
-            ["Activa", "Modificada", "Suspendida"],
-            key=f"med_estado_{paciente_id}"
-        )
-
-    observaciones_medicacion = st.text_area(
-        "Observaciones",
-        key=f"med_obs_{paciente_id}",
-        height=80
-    )
-
-    if st.button("Guardar medicación", key=f"btn_guardar_medicacion_{paciente_id}"):
-        try:
-            guardar_medicacion(
-                paciente_id=paciente_id,
-                fecha_cambio=fecha_cambio,
-                droga=droga,
-                dosis=dosis,
-                unidad=unidad,
-                frecuencia=frecuencia,
-                via_administracion=via_administracion,
-                estado=estado_medicacion,
-                observaciones=observaciones_medicacion
+with col_med_centro:
+    with st.container(border=True):
+            fecha_cambio = st.date_input(
+                "Fecha de cambio",
+                value=date.today(),
+                key=f"med_fecha_{paciente_id}"
             )
-            st.success("Medicación guardada correctamente.")
-            st.rerun()
-        except Exception as e:
-            st.error(f"Error al guardar medicación: {e}")
 
-    st.markdown("#### Historial de medicación")
+            col_m1, col_m2 = st.columns(2)
 
-    df_medicacion = df_medicacion_export.copy()
+            with col_m1:
+                droga = st.text_input("Droga", key=f"med_droga_{paciente_id}")
+                dosis = st.number_input(
+                    "Dosis",
+                    min_value=0.0,
+                    max_value=99999.0,
+                    step=0.1,
+                    format="%.2f",
+                    key=f"med_dosis_{paciente_id}"
+                )
+                unidad = st.text_input(
+                    "Unidad",
+                    placeholder="mg / mcg / ml / comprimidos",
+                    key=f"med_unidad_{paciente_id}"
+                )
 
-    if not df_medicacion.empty:
-        if "fecha_cambio" in df_medicacion.columns:
-            df_medicacion["fecha_cambio"] = pd.to_datetime(df_medicacion["fecha_cambio"], errors="coerce")
-            df_medicacion = df_medicacion.sort_values("fecha_cambio", ascending=False)
-            df_medicacion["fecha_cambio"] = df_medicacion["fecha_cambio"].dt.strftime("%Y-%m-%d")
+            with col_m2:
+                frecuencia = st.text_input(
+                    "Frecuencia",
+                    placeholder="Cada 24 h / Cada 12 h",
+                    key=f"med_frecuencia_{paciente_id}"
+                )
+                via_administracion = st.selectbox(
+                    "Vía de administración",
+                    ["Oral", "Subcutánea", "Intravenosa", "Intramuscular", "Tópica", "Inhalatoria", "Otra"],
+                    key=f"med_via_{paciente_id}"
+                )
+                estado_medicacion = st.selectbox(
+                    "Estado",
+                    ["Activa", "Modificada", "Suspendida"],
+                    key=f"med_estado_{paciente_id}"
+                )
 
-        columnas_medicacion = [
-            "fecha_cambio",
-            "droga",
-            "dosis",
-            "unidad",
-            "frecuencia",
-            "via_administracion",
-            "estado",
-            "observaciones"
-        ]
-        columnas_medicacion = [c for c in columnas_medicacion if c in df_medicacion.columns]
+            observaciones_medicacion = st.text_area(
+                "Observaciones",
+                key=f"med_obs_{paciente_id}",
+                height=80
+            )
 
-        st.dataframe(
-            df_medicacion[columnas_medicacion],
-            use_container_width=True,
-            hide_index=True,
-            height=220
-        )
-    else:
-        st.info("Sin historial de medicación.")
+            if st.button("Guardar medicación", key=f"btn_guardar_medicacion_{paciente_id}"):
+                try:
+                    guardar_medicacion(
+                        paciente_id=paciente_id,
+                        fecha_cambio=fecha_cambio,
+                        droga=droga,
+                        dosis=dosis,
+                        unidad=unidad,
+                        frecuencia=frecuencia,
+                        via_administracion=via_administracion,
+                        estado=estado_medicacion,
+                        observaciones=observaciones_medicacion
+                    )
+                    st.success("Medicación guardada correctamente.")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error al guardar medicación: {e}")
+
+            st.markdown("#### Historial de medicación")
+            st.markdown('<div class="table-caption">Cambios terapéuticos registrados por fecha.</div>', unsafe_allow_html=True)
+
+            df_medicacion = df_medicacion_export.copy()
+
+            if not df_medicacion.empty:
+                if "fecha_cambio" in df_medicacion.columns:
+                    df_medicacion["fecha_cambio"] = pd.to_datetime(df_medicacion["fecha_cambio"], errors="coerce")
+                    df_medicacion = df_medicacion.sort_values("fecha_cambio", ascending=False)
+                    df_medicacion["fecha_cambio"] = df_medicacion["fecha_cambio"].dt.strftime("%Y-%m-%d")
+
+                columnas_medicacion = [
+                    "fecha_cambio",
+                    "droga",
+                    "dosis",
+                    "unidad",
+                    "frecuencia",
+                    "via_administracion",
+                    "estado",
+                    "observaciones"
+                ]
+                columnas_medicacion = [c for c in columnas_medicacion if c in df_medicacion.columns]
+
+                st.dataframe(
+                    df_medicacion[columnas_medicacion],
+                    use_container_width=True,
+                    hide_index=True,
+                    height=220
+                )
+            else:
+                st.info("Sin historial de medicación.")
 
 st.divider()
 filtro_historial_global = "Todas"
@@ -3625,6 +3796,7 @@ informe_integrado = generar_informe_integrado_paciente(
 )
 
 st.markdown("## Informe integrado del paciente")
+st.markdown('<div class="section-subtle">Resumen clínico consolidado del estado funcional y cardiometabólico.</div>', unsafe_allow_html=True)
 
 bg_estado_global, fg_estado_global = color_estado_global_informe(informe_integrado["estado_global"])
 
