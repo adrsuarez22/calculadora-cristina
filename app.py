@@ -2022,6 +2022,41 @@ def generar_pdf_paciente(ficha, df_peso, df_inbody, df_eval, df_medicacion):
         styles=styles
     ))
 
+    informe_pdf = generar_informe_integrado_paciente(
+        ficha=ficha,
+        df_peso=df_peso,
+        df_inbody=df_inbody,
+        df_eval=df_eval,
+        df_medicacion=df_medicacion
+    )
+    percentiles_pdf = informe_pdf.get("percentiles_funcionales", {})
+    p_caminata_pdf = percentiles_pdf.get("Caminata 6 minutos")
+    p_prension_pdf = percentiles_pdf.get("Prensión manual")
+    p_silla_pdf = percentiles_pdf.get("Levantarse de la silla")
+
+    story.append(Spacer(1, 0.3 * cm))
+    story.append(Paragraph("Resumen funcional integrado", styles["SubTitulo"]))
+    story.append(Paragraph(
+        f"<b>Caminata 6 minutos:</b> {('P' + str(p_caminata_pdf)) if p_caminata_pdf is not None else '-'}",
+        styles["Caja"]
+    ))
+    story.append(Paragraph(
+        f"<b>Prensión manual:</b> {('P' + str(p_prension_pdf)) if p_prension_pdf is not None else '-'}",
+        styles["Caja"]
+    ))
+    story.append(Paragraph(
+        f"<b>Levantarse de la silla:</b> {('P' + str(p_silla_pdf)) if p_silla_pdf is not None else '-'}",
+        styles["Caja"]
+    ))
+    story.append(Paragraph(
+        f"<b>Comentario clínico unificado:</b> {informe_pdf.get('comentario_unificado', '-')}",
+        styles["Caja"]
+    ))
+    story.append(Paragraph(
+        f"<b>Recomendación unificada:</b> {informe_pdf.get('recomendacion_final', '-')}",
+        styles["Caja"]
+    ))
+
     story.append(Spacer(1, 0.55 * cm))
     story.append(Paragraph("<font color='#B0B7C3'>______________________________________________</font>", styles["Caja"]))
     story.append(Spacer(1, 0.12 * cm))
@@ -2462,10 +2497,18 @@ def generar_informe_integrado_paciente(ficha, df_peso, df_inbody, df_eval, df_me
         estado_global = "Perfil conservado"
 
     partes_comentario = [f"Paciente {nombre}."]
-    if promedio_percentil is not None:
-        partes_comentario.append(f"Promedio funcional reciente: P{promedio_percentil}.")
-    if peor_percentil is not None:
-        partes_comentario.append(f"Peor desempeño funcional: P{round(peor_percentil, 1)}.")
+
+    resumen_funcional = []
+    if percentiles_funcionales.get("Caminata 6 minutos") is not None:
+        resumen_funcional.append(f"Caminata 6 minutos: P{percentiles_funcionales['Caminata 6 minutos']}")
+    if percentiles_funcionales.get("Prensión manual") is not None:
+        resumen_funcional.append(f"Prensión manual: P{percentiles_funcionales['Prensión manual']}")
+    if percentiles_funcionales.get("Levantarse de la silla") is not None:
+        resumen_funcional.append(f"Levantarse de la silla: P{percentiles_funcionales['Levantarse de la silla']}")
+
+    if resumen_funcional:
+        partes_comentario.append("Percentiles funcionales recientes: " + "; ".join(resumen_funcional) + ".")
+
     if estado_corporal != "Sin datos":
         partes_comentario.append(f"Estado corporal actual: {estado_corporal}.")
     if clasif_abdominal != "Sin clasificar":
