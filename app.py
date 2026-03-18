@@ -2689,7 +2689,6 @@ with top4:
                 st.session_state["paciente_id_seleccionado"] = None
                 st.session_state["paciente_nombre_pendiente"] = None
                 st.session_state["paciente_cargado_id"] = None
-                st.session_state["selector_paciente"] = None
                 st.session_state["mostrar_form_nuevo_paciente"] = False
                 st.session_state["limpiar_busqueda_pendiente"] = True
 
