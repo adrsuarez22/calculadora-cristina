@@ -2049,6 +2049,14 @@ def generar_pdf_paciente(ficha, df_peso, df_inbody, df_eval, df_medicacion):
         styles["Caja"]
     ))
     story.append(Paragraph(
+        f"<b>Comentario peso / índices:</b> {informe_pdf.get('comentario_peso', '-')}",
+        styles["Caja"]
+    ))
+    story.append(Paragraph(
+        f"<b>Comentario composición corporal:</b> {informe_pdf.get('comentario_composicion', '-')}",
+        styles["Caja"]
+    ))
+    story.append(Paragraph(
         f"<b>Comentario clínico unificado:</b> {informe_pdf.get('comentario_unificado', '-')}",
         styles["Caja"]
     ))
@@ -2538,12 +2546,40 @@ def generar_informe_integrado_paciente(ficha, df_peso, df_inbody, df_eval, df_me
     recomendaciones = list(dict.fromkeys([r for r in recomendaciones if r]))
     recomendacion_final = " ".join(recomendaciones) if recomendaciones else "Mantener seguimiento periódico y repetir controles según evolución."
 
+    comentario_peso = ""
+    if ultimo_peso is not None:
+        partes_peso = []
+        if pd.notna(ultimo_peso.get("imc")):
+            partes_peso.append(f"IMC {round(float(ultimo_peso.get('imc')), 2)} ({clasificar_imc(float(ultimo_peso.get('imc')))[0]})")
+        if pd.notna(ultimo_peso.get("icc")):
+            partes_peso.append(f"ICC {round(float(ultimo_peso.get('icc')), 2)} ({clasificacion_icc(sexo, ultimo_peso.get('icc'))})")
+        if pd.notna(ultimo_peso.get("ica")):
+            partes_peso.append(f"ICA {round(float(ultimo_peso.get('ica')), 2)} ({clasificacion_ica(ultimo_peso.get('ica'))})")
+        if clasif_abdominal != "Sin clasificar":
+            partes_peso.append(f"Conclusión abdominal: {clasif_abdominal}")
+        comentario_peso = ". ".join(partes_peso) + "." if partes_peso else ""
+
+    comentario_composicion = ""
+    if ultimo_inbody is not None:
+        partes_comp = []
+        if pd.notna(ultimo_inbody.get("grasa_corporal_pct")):
+            partes_comp.append(f"Grasa corporal {round(float(ultimo_inbody.get('grasa_corporal_pct')), 1)}% ({ultimo_inbody.get('clasif_grasa', '-')})")
+        if pd.notna(ultimo_inbody.get("musculo_rel_pct")):
+            partes_comp.append(f"Músculo relativo {round(float(ultimo_inbody.get('musculo_rel_pct')), 1)}% ({ultimo_inbody.get('clasif_musculo', '-')})")
+        if pd.notna(ultimo_inbody.get("grasa_visceral")):
+            partes_comp.append(f"Grasa visceral {round(float(ultimo_inbody.get('grasa_visceral')), 1)} ({ultimo_inbody.get('clasif_visceral', '-')})")
+        if estado_corporal != "Sin datos":
+            partes_comp.append(f"Estado corporal: {estado_corporal}")
+        comentario_composicion = ". ".join(partes_comp) + "." if partes_comp else ""
+
     return {
         "estado_global": estado_global,
         "estado_corporal": estado_corporal,
         "peor_percentil": peor_percentil,
         "promedio_percentil": promedio_percentil,
         "percentiles_funcionales": percentiles_funcionales,
+        "comentario_peso": comentario_peso,
+        "comentario_composicion": comentario_composicion,
         "comentario_unificado": comentario_unificado,
         "recomendacion_final": recomendacion_final,
         "tabla_resumen": df_resumen
@@ -3701,6 +3737,8 @@ with ii2:
         st.write(f"**Estado corporal:** {informe_integrado['estado_corporal']}")
         st.write(f"**Paciente:** {ficha['nombre']}")
         st.write(f"**Sexo / talla:** {str(ficha['sexo']).capitalize() if ficha['sexo'] else '-'} / {ficha['talla_m'] if ficha['talla_m'] is not None else '-'}")
+        st.write(f"**Peso / índices:** {informe_integrado.get('comentario_peso', '-')}")
+        st.write(f"**Composición corporal:** {informe_integrado.get('comentario_composicion', '-')}")
 
 with ii3:
     with st.container(border=True):
@@ -3718,6 +3756,26 @@ if df_tabla_resumen is not None and not df_tabla_resumen.empty:
         use_container_width=True,
         hide_index=True
     )
+
+st.markdown(
+    f"""
+    <div class="motivo-box">
+        <b>Comentario peso / índices:</b><br><br>
+        {informe_integrado.get("comentario_peso", "-")}
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
+st.markdown(
+    f"""
+    <div class="motivo-box">
+        <b>Comentario composición corporal:</b><br><br>
+        {informe_integrado.get("comentario_composicion", "-")}
+    </div>
+    """,
+    unsafe_allow_html=True
+)
 
 st.markdown(
     f"""
