@@ -212,6 +212,9 @@ if "limpiar_busqueda_pendiente" not in st.session_state:
 if "paciente_nombre_pendiente" not in st.session_state:
     st.session_state["paciente_nombre_pendiente"] = None
 
+if "selector_paciente" not in st.session_state:
+    st.session_state["selector_paciente"] = None
+
 
 def calcular_edad_desde_fecha(fecha_nacimiento):
     if not fecha_nacimiento:
@@ -2641,6 +2644,14 @@ with top1:
                 indice_default = i
                 break
 
+    etiqueta_preseleccionada = etiquetas[indice_default] if etiquetas else None
+
+    if etiqueta_preseleccionada is not None:
+        if st.session_state.get("selector_paciente") not in etiquetas:
+            st.session_state["selector_paciente"] = etiqueta_preseleccionada
+        elif paciente_id_preseleccionado is not None or paciente_nombre_pendiente:
+            st.session_state["selector_paciente"] = etiqueta_preseleccionada
+
     seleccion = st.selectbox(
         "Seleccionar paciente",
         etiquetas,
@@ -2675,6 +2686,7 @@ with top4:
                 st.session_state["paciente_id_seleccionado"] = None
                 st.session_state["paciente_nombre_pendiente"] = None
                 st.session_state["paciente_cargado_id"] = None
+                st.session_state["selector_paciente"] = None
                 st.session_state["mostrar_form_nuevo_paciente"] = False
                 st.session_state["limpiar_busqueda_pendiente"] = True
 
