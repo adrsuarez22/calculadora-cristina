@@ -139,8 +139,7 @@ st.set_page_config(
 st.markdown("""
 <style>
 [data-testid="stAppViewContainer"] {
-    background-color: #eef2f7;
-    color: #1f2937;
+    background-color: #f7f8fa;
 }
 
 [data-testid="stHeader"] {
@@ -157,26 +156,6 @@ st.markdown("""
     max-width: 1400px;
 }
 
-h1, h2, h3, h4 {
-    color: #18212f;
-}
-
-p, label, .stMarkdown, .stCaption {
-    color: #334155;
-}
-
-[data-testid="stVerticalBlockBorderWrapper"] {
-    background-color: #ffffff;
-    border: 1px solid #d7dee8;
-    border-radius: 12px;
-    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
-}
-
-[data-testid="stDataFrame"] {
-    background-color: #ffffff;
-    border-radius: 12px;
-}
-
 .result-card {
     padding: 14px 16px;
     border-radius: 10px;
@@ -188,7 +167,7 @@ p, label, .stMarkdown, .stCaption {
 
 .motivo-box {
     background-color: #ffffff;
-    border: 1px solid #d7dee8;
+    border: 1px solid #e6e9ef;
     border-radius: 10px;
     padding: 12px 14px;
     margin-bottom: 12px;
@@ -196,7 +175,7 @@ p, label, .stMarkdown, .stCaption {
 
 .reco-box {
     background-color: #eef7ef;
-    border: 1px solid #cfe3d2;
+    border: 1px solid #d4ead7;
     border-radius: 10px;
     padding: 12px 14px;
     margin-bottom: 14px;
@@ -235,6 +214,9 @@ if "paciente_nombre_pendiente" not in st.session_state:
 
 if "selector_paciente" not in st.session_state:
     st.session_state["selector_paciente"] = None
+
+if "mostrar_form_editar_paciente" not in st.session_state:
+    st.session_state["mostrar_form_editar_paciente"] = False
 
 
 def calcular_edad_desde_fecha(fecha_nacimiento):
@@ -636,6 +618,41 @@ def guardar_paciente(nombre, sexo, fecha_nacimiento, talla_m):
     }
 
     resp = supabase.table("pacientes").insert(payload).execute()
+    limpiar_cache()
+    return resp
+
+
+def actualizar_paciente(paciente_id, nombre, sexo, fecha_nacimiento, talla_m):
+    nombre_limpio = str(nombre).strip()
+    sexo_limpio = str(sexo).strip().lower()
+
+    if not nombre_limpio:
+        raise ValueError("El nombre del paciente está vacío.")
+
+    if talla_m is None or float(talla_m) <= 0:
+        raise ValueError("La talla debe ser mayor a 0.")
+
+    respuesta = supabase.table("pacientes").select("id,nombre").execute()
+    existentes = respuesta.data if respuesta.data else []
+
+    for p in existentes:
+        if int(p["id"]) != int(paciente_id) and str(p["nombre"]).strip().lower() == nombre_limpio.lower():
+            raise ValueError("Ya existe otro paciente con ese nombre.")
+
+    payload = {
+        "nombre": nombre_limpio,
+        "sexo": sexo_limpio,
+        "fecha_nacimiento": str(fecha_nacimiento),
+        "talla_m": round(float(talla_m), 2)
+    }
+
+    resp = (
+        supabase
+        .table("pacientes")
+        .update(payload)
+        .eq("id", int(paciente_id))
+        .execute()
+    )
     limpiar_cache()
     return resp
 
@@ -2641,6 +2658,7 @@ if st.session_state["mostrar_form_nuevo_paciente"]:
                                 nuevo_paciente_id = paciente_recien_creado.get("id")
 
                         st.session_state["mostrar_form_nuevo_paciente"] = False
+                        st.session_state["mostrar_form_editar_paciente"] = False
                         st.session_state["busqueda_paciente"] = ""
                         st.session_state["paciente_id_seleccionado"] = nuevo_paciente_id
                         st.session_state["paciente_nombre_pendiente"] = str(nuevo_nombre).strip().lower()
@@ -2740,6 +2758,9 @@ with top1:
 
     st.session_state["paciente_id_seleccionado"] = paciente_id
 
+    if st.button("✏️ Editar ficha", key=f"btn_mostrar_editar_paciente_{paciente_id}"):
+        st.session_state["mostrar_form_editar_paciente"] = True
+
 with top4:
     st.markdown("###")
 
@@ -2768,6 +2789,81 @@ with top4:
 
             except Exception as e:
                 st.error(f"Error al eliminar paciente: {e}")
+
+
+if st.session_state.get("mostrar_form_editar_paciente", False):
+    with st.expander("✏️ Editar ficha del paciente", expanded=True):
+        editar_nombre = st.text_input(
+            "Nombre del paciente",
+            value=str(paciente_actual.get("nombre", "")),
+            key=f"editar_nombre_{paciente_id}"
+        )
+        sexo_actual = str(paciente_actual.get("sexo", "hombre")).strip().lower()
+        indice_sexo = 1 if sexo_actual == "mujer" else 0
+        editar_sexo = st.selectbox(
+            "Sexo",
+            ["hombre", "mujer"],
+            index=indice_sexo,
+            key=f"editar_sexo_{paciente_id}"
+        )
+
+        fecha_nac_actual = pd.to_datetime(
+            paciente_actual.get("fecha_nacimiento"),
+            errors="coerce"
+        )
+        if pd.isna(fecha_nac_actual):
+            fecha_nac_default = date(1970, 1, 1)
+        else:
+            fecha_nac_default = fecha_nac_actual.date()
+
+        editar_fecha_nacimiento = st.date_input(
+            "Fecha de nacimiento",
+            value=fecha_nac_default,
+            min_value=date(1920, 1, 1),
+            max_value=date.today(),
+            format="DD/MM/YYYY",
+            key=f"editar_fecha_nacimiento_{paciente_id}"
+        )
+
+        talla_actual = pd.to_numeric(paciente_actual.get("talla_m"), errors="coerce")
+        if pd.isna(talla_actual) or float(talla_actual) <= 0:
+            talla_actual = 1.60
+
+        editar_talla = st.number_input(
+            "Talla (m)",
+            min_value=0.50,
+            max_value=2.50,
+            value=round(float(talla_actual), 2),
+            step=0.01,
+            format="%.2f",
+            key=f"editar_talla_{paciente_id}"
+        )
+
+        col_ed1, col_ed2 = st.columns(2)
+
+        with col_ed1:
+            if st.button("Guardar cambios", key=f"btn_guardar_edicion_{paciente_id}"):
+                try:
+                    actualizar_paciente(
+                        paciente_id=paciente_id,
+                        nombre=editar_nombre,
+                        sexo=editar_sexo,
+                        fecha_nacimiento=editar_fecha_nacimiento,
+                        talla_m=editar_talla
+                    )
+                    st.session_state["mostrar_form_editar_paciente"] = False
+                    st.session_state["paciente_nombre_pendiente"] = str(editar_nombre).strip().lower()
+                    st.session_state["paciente_id_seleccionado"] = paciente_id
+                    st.session_state["paciente_cargado_id"] = None
+                    st.success("Ficha del paciente actualizada correctamente.")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error al actualizar paciente: {e}")
+
+        with col_ed2:
+            if st.button("Cancelar edición", key=f"btn_cancelar_edicion_{paciente_id}"):
+                st.session_state["mostrar_form_editar_paciente"] = False
+                st.rerun()
 
 # =========================================================
 # FICHA + DATAFRAMES BASE
@@ -2997,15 +3093,7 @@ if not df_peso_hist.empty:
     df_peso_hist["fecha"] = pd.to_datetime(df_peso_hist["fecha"], errors="coerce")
     df_peso_hist = df_peso_hist.dropna(subset=["fecha"]).sort_values("fecha", ascending=False)
 
-    h1, h2, h3, h4, h5, h6, h7, h8 = st.columns([1.2, 0.9, 0.9, 0.9, 0.9, 0.8, 0.8, 0.5])
-    h1.markdown("**Fecha**")
-    h2.markdown("**Peso**")
-    h3.markdown("**IMC**")
-    h4.markdown("**Cintura**")
-    h5.markdown("**Cadera**")
-    h6.markdown("**ICC**")
-    h7.markdown("**ICA**")
-    h8.markdown("**Eliminar**")
+    st.markdown("**Fecha | Peso | IMC | Cintura | Cadera | ICC | ICA | Eliminar**")
 
     for _, row in df_peso_hist.iterrows():
         c1, c2, c3, c4, c5, c6, c7, c8 = st.columns([1.2, 0.9, 0.9, 0.9, 0.9, 0.8, 0.8, 0.5])
@@ -3278,13 +3366,7 @@ if not df_historial.empty:
 
     df_historial_mostrar = df_historial_mostrar.sort_values(by="fecha", ascending=False)
 
-    h1, h2, h3, h4, h5, h6 = st.columns([1, 2, 1, 1, 1, 0.5])
-    h1.markdown("**Fecha**")
-    h2.markdown("**Prueba**")
-    h3.markdown("**Valor**")
-    h4.markdown("**Percentil**")
-    h5.markdown("**Clasificación**")
-    h6.markdown("**Eliminar**")
+    st.markdown("**Fecha | Prueba | Valor | Percentil | Clasificación | Eliminar**")
 
     for _, row in df_historial_mostrar.iterrows():
         c1, c2, c3, c4, c5, c6 = st.columns([1, 2, 1, 1, 1, 0.5])
@@ -3543,7 +3625,7 @@ with st.container(border=True):
 # =========================================================
 
 
-st.markdown("#### Historial composición corporal")
+st.markdown("#### Historial corporal")
 
 df_inbody = df_inbody_export.copy()
 if not df_inbody.empty:
@@ -3555,14 +3637,7 @@ if not df_inbody.empty:
     df_inbody["fecha"] = pd.to_datetime(df_inbody["fecha"], errors="coerce")
     df_inbody = df_inbody.dropna(subset=["fecha"]).sort_values("fecha", ascending=False)
 
-    h1, h2, h3, h4, h5, h6, h7 = st.columns([1.2, 1, 0.8, 1, 1, 1.8, 0.5])
-    h1.markdown("**Fecha**")
-    h2.markdown("**Peso**")
-    h3.markdown("**IMC**")
-    h4.markdown("**% Grasa**")
-    h5.markdown("**Músculo**")
-    h6.markdown("**Diagnóstico**")
-    h7.markdown("**Eliminar**")
+    st.markdown("**Fecha | Peso | IMC | % Grasa | Músculo | Diagnóstico | Eliminar**")
 
     for _, row in df_inbody.iterrows():
         c1, c2, c3, c4, c5, c6, c7 = st.columns([1.2, 1, 0.8, 1, 1, 1.8, 0.5])
@@ -3589,7 +3664,7 @@ if not df_inbody.empty:
             except Exception as e:
                 st.error(f"Error al eliminar registro corporal: {e}")
 else:
-    st.info("Sin historial de composición corporal.")
+    st.info("Sin historial corporal.")
 
 st.divider()
 st.markdown("### Medicación")
