@@ -139,7 +139,7 @@ st.set_page_config(
 st.markdown("""
 <style>
 [data-testid="stAppViewContainer"] {
-    background: linear-gradient(180deg, #f7f8fa 0%, #f3f5f9 100%);
+    background-color: #f7f8fa;
 }
 
 [data-testid="stHeader"] {
@@ -156,74 +156,29 @@ st.markdown("""
     max-width: 1400px;
 }
 
-h1, h2, h3 {
-    letter-spacing: -0.02em;
-}
-
 .result-card {
     padding: 14px 16px;
-    border-radius: 12px;
+    border-radius: 10px;
     font-size: 18px;
     font-weight: 700;
     margin-top: 8px;
-    margin-bottom: 12px;
-    box-shadow: 0 6px 18px rgba(16, 24, 40, 0.08);
-}
-
-.soft-card {
-    background: #ffffff;
-    border: 1px solid #e6e9ef;
-    border-radius: 14px;
-    padding: 16px 16px 14px 16px;
-    box-shadow: 0 6px 18px rgba(16, 24, 40, 0.05);
-    min-height: 146px;
-    margin-bottom: 8px;
-}
-
-.soft-card-title {
-    font-size: 14px;
-    font-weight: 700;
-    color: #344054;
     margin-bottom: 10px;
-}
-
-.soft-card-value {
-    font-size: 24px;
-    font-weight: 800;
-    color: #101828;
-    line-height: 1.1;
-    margin-bottom: 8px;
-}
-
-.soft-card-meta {
-    font-size: 13px;
-    color: #475467;
-    line-height: 1.5;
-}
-
-.section-subtle {
-    font-size: 12px;
-    color: #667085;
-    margin-top: -6px;
-    margin-bottom: 8px;
 }
 
 .motivo-box {
     background-color: #ffffff;
     border: 1px solid #e6e9ef;
-    border-radius: 12px;
+    border-radius: 10px;
     padding: 12px 14px;
     margin-bottom: 12px;
-    box-shadow: 0 4px 12px rgba(16, 24, 40, 0.04);
 }
 
 .reco-box {
     background-color: #eef7ef;
     border: 1px solid #d4ead7;
-    border-radius: 12px;
+    border-radius: 10px;
     padding: 12px 14px;
     margin-bottom: 14px;
-    box-shadow: 0 4px 12px rgba(16, 24, 40, 0.04);
 }
 </style>
 """, unsafe_allow_html=True)
@@ -2811,114 +2766,62 @@ st.divider()
 # =========================================================
 # TARJETAS RESUMEN
 # =========================================================
-
 k1, k2, k3, k4 = st.columns(4)
 
-peso_card_valor = "-"
-peso_card_meta = "Sin registros"
-imc_card_meta = "-"
-riesgo_card_meta = "-"
-
-if not df_peso_export.empty:
-    df_peso_tmp = df_peso_export.copy()
-    df_peso_tmp["fecha"] = pd.to_datetime(df_peso_tmp["fecha"], errors="coerce")
-    df_peso_tmp = df_peso_tmp.dropna(subset=["fecha"]).sort_values("fecha", ascending=False)
-
-    if not df_peso_tmp.empty:
-        ultimo_peso = df_peso_tmp.iloc[0]
-        peso_card_valor = f"{float(ultimo_peso['peso_kg']):.1f} kg"
-        peso_card_meta = f"Fecha: {ultimo_peso['fecha'].strftime('%d-%m-%Y')}"
-        imc_card_meta = f"IMC: {float(ultimo_peso['imc']):.2f}" if pd.notna(ultimo_peso.get("imc")) else "IMC: -"
-
-        partes_riesgo = []
-        if pd.notna(ultimo_peso.get("icc")):
-            partes_riesgo.append(f"ICC: {float(ultimo_peso['icc']):.2f}")
-        if pd.notna(ultimo_peso.get("ica")):
-            partes_riesgo.append(f"ICA: {float(ultimo_peso['ica']):.2f}")
-        riesgo_card_meta = " | ".join(partes_riesgo) if partes_riesgo else "-"
-
-estado_corporal_card = "Sin registros"
-estado_corporal_meta_1 = "Grasa: -"
-estado_corporal_meta_2 = "Músculo: -"
-
-if not df_inbody_export.empty and ficha["talla_m"] is not None:
-    df_corporal_tmp = enriquecer_historial_corporal(
-        df_inbody_export,
-        str(ficha["sexo"]).strip().lower(),
-        ficha["talla_m"]
-    )
-    df_corporal_tmp["fecha"] = pd.to_datetime(df_corporal_tmp["fecha"], errors="coerce")
-    df_corporal_tmp = df_corporal_tmp.dropna(subset=["fecha"]).sort_values("fecha", ascending=False)
-
-    if not df_corporal_tmp.empty:
-        ultimo_corporal = df_corporal_tmp.iloc[0]
-        estado_corporal_card = str(ultimo_corporal.get("diagnostico_corporal", "Sin registros"))
-        estado_corporal_meta_1 = f"Grasa: {ultimo_corporal.get('clasif_grasa', '-')}"
-        estado_corporal_meta_2 = f"Músculo: {ultimo_corporal.get('clasif_musculo', '-')}"
-
-ultima_eval_card = ficha["ultima_clasificacion"] if ficha["ultima_clasificacion"] != "-" else "Sin datos"
-ultima_eval_meta_1 = f"Fecha: {ficha['ultima_fecha']}"
-ultima_eval_meta_2 = f"Prueba: {ficha['ultima_prueba']}"
-
 with k1:
-    st.markdown(
-        f"""
-        <div class="soft-card">
-            <div class="soft-card-title">Paciente</div>
-            <div class="soft-card-value">{ficha['nombre']}</div>
-            <div class="soft-card-meta">
-                Sexo: {str(ficha['sexo']).capitalize() if ficha['sexo'] != '-' else '-'}<br>
-                Talla: {f"{float(ficha['talla_m']):.2f} m" if ficha['talla_m'] is not None else '-'}
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+    with st.container(border=True):
+        st.markdown("#### Paciente")
+        st.write(f"**Nombre:** {ficha['nombre']}")
+        st.write(f"**Sexo:** {str(ficha['sexo']).capitalize() if ficha['sexo'] != '-' else '-'}")
+        if ficha["talla_m"] is not None:
+            st.write(f"**Talla:** {float(ficha['talla_m']):.2f} m")
+        else:
+            st.write("**Talla:** -")
 
 with k2:
-    st.markdown(
-        f"""
-        <div class="soft-card">
-            <div class="soft-card-title">Peso / IMC</div>
-            <div class="soft-card-value">{peso_card_valor}</div>
-            <div class="soft-card-meta">
-                {peso_card_meta}<br>
-                {imc_card_meta}
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+    with st.container(border=True):
+        st.markdown("#### Peso / IMC")
+        if not df_peso_export.empty:
+            df_peso_tmp = df_peso_export.copy()
+            df_peso_tmp["fecha"] = pd.to_datetime(df_peso_tmp["fecha"], errors="coerce")
+            df_peso_tmp = df_peso_tmp.dropna(subset=["fecha"]).sort_values("fecha", ascending=False)
+            ultimo_peso = df_peso_tmp.iloc[0]
+            st.write(f"**Peso:** {float(ultimo_peso['peso_kg']):.1f} kg")
+            st.write(f"**IMC:** {float(ultimo_peso['imc']):.2f}")
+            if pd.notna(ultimo_peso.get('icc')):
+                st.write(f"**ICC:** {float(ultimo_peso['icc']):.2f} ({clasificacion_icc(ficha['sexo'], ultimo_peso['icc'])})")
+            if pd.notna(ultimo_peso.get('ica')):
+                st.write(f"**ICA:** {float(ultimo_peso['ica']):.2f} ({clasificacion_ica(ultimo_peso['ica'])})")
+            st.write(f"**Fecha:** {ultimo_peso['fecha'].strftime('%d-%m-%Y')}")
+        else:
+            st.write("Sin registros")
 
 with k3:
-    st.markdown(
-        f"""
-        <div class="soft-card">
-            <div class="soft-card-title">Estado corporal</div>
-            <div class="soft-card-value">{estado_corporal_card}</div>
-            <div class="soft-card-meta">
-                {estado_corporal_meta_1}<br>
-                {estado_corporal_meta_2}
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+    with st.container(border=True):
+        st.markdown("#### Estado corporal")
+        if not df_inbody_export.empty and ficha["talla_m"] is not None:
+            df_corporal_tmp = enriquecer_historial_corporal(
+                df_inbody_export,
+                str(ficha["sexo"]).strip().lower(),
+                ficha["talla_m"]
+            )
+            df_corporal_tmp["fecha"] = pd.to_datetime(df_corporal_tmp["fecha"], errors="coerce")
+            df_corporal_tmp = df_corporal_tmp.dropna(subset=["fecha"]).sort_values("fecha", ascending=False)
+            ultimo_corporal = df_corporal_tmp.iloc[0]
+
+            st.write(f"**Estado:** {ultimo_corporal.get('diagnostico_corporal', '-')}")
+            st.write(f"**Grasa:** {ultimo_corporal.get('clasif_grasa', '-')}")
+            st.write(f"**Músculo:** {ultimo_corporal.get('clasif_musculo', '-')}")
+        else:
+            st.write("Sin registros")
 
 with k4:
-    st.markdown(
-        f"""
-        <div class="soft-card">
-            <div class="soft-card-title">Última evaluación</div>
-            <div class="soft-card-value">{ultima_eval_card}</div>
-            <div class="soft-card-meta">
-                {ultima_eval_meta_1}<br>
-                {ultima_eval_meta_2}
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+    with st.container(border=True):
+        st.markdown("#### Última evaluación")
+        st.write(f"**Fecha:** {ficha['ultima_fecha']}")
+        st.write(f"**Prueba:** {ficha['ultima_prueba']}")
+        st.write(f"**Clasificación:** {ficha['ultima_clasificacion']}")
+
 st.divider()
 
 
@@ -2926,7 +2829,6 @@ st.divider()
 # INGRESO DE DATOS
 # =========================================================
 st.markdown("## Ingreso de datos")
-st.markdown('<div class="section-subtle">Carga clínica, composición corporal y seguimiento funcional.</div>', unsafe_allow_html=True)
 
 # =========================================================
 # PESO E IMC
@@ -3723,7 +3625,6 @@ informe_integrado = generar_informe_integrado_paciente(
 )
 
 st.markdown("## Informe integrado del paciente")
-st.markdown('<div class="section-subtle">Resumen clínico consolidado del estado funcional y cardiometabólico.</div>', unsafe_allow_html=True)
 
 bg_estado_global, fg_estado_global = color_estado_global_informe(informe_integrado["estado_global"])
 
