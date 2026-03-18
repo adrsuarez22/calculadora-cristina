@@ -209,6 +209,9 @@ if "busqueda_paciente" not in st.session_state:
 if "limpiar_busqueda_pendiente" not in st.session_state:
     st.session_state["limpiar_busqueda_pendiente"] = False
 
+if "paciente_nombre_pendiente" not in st.session_state:
+    st.session_state["paciente_nombre_pendiente"] = None
+
 
 def calcular_edad_desde_fecha(fecha_nacimiento):
     if not fecha_nacimiento:
@@ -318,6 +321,31 @@ def obtener_pacientes():
     except Exception as e:
         st.error(f"Error al leer pacientes: {e}")
         return []
+
+
+def obtener_paciente_por_nombre(nombre):
+    try:
+        nombre_limpio = str(nombre).strip()
+
+        if not nombre_limpio:
+            return None
+
+        resp = (
+            supabase
+            .table("pacientes")
+            .select("id,nombre,sexo,fecha_nacimiento,talla_m")
+            .ilike("nombre", nombre_limpio)
+            .order("id", desc=True)
+            .limit(1)
+            .execute()
+        )
+
+        if resp.data:
+            return resp.data[0]
+
+        return None
+    except Exception:
+        return None
 
 
 @st.cache_data(ttl=300)
@@ -2533,15 +2561,14 @@ if st.session_state["mostrar_form_nuevo_paciente"]:
                                 nuevo_paciente_id = None
 
                         if nuevo_paciente_id is None:
-                            pacientes_actualizados = obtener_pacientes()
-                            for p in pacientes_actualizados:
-                                if str(p.get("nombre", "")).strip().lower() == nuevo_nombre.strip().lower():
-                                    nuevo_paciente_id = p.get("id")
-                                    break
+                            paciente_recien_creado = obtener_paciente_por_nombre(nuevo_nombre)
+                            if paciente_recien_creado is not None:
+                                nuevo_paciente_id = paciente_recien_creado.get("id")
 
                         st.session_state["mostrar_form_nuevo_paciente"] = False
                         st.session_state["busqueda_paciente"] = ""
                         st.session_state["paciente_id_seleccionado"] = nuevo_paciente_id
+                        st.session_state["paciente_nombre_pendiente"] = str(nuevo_nombre).strip().lower()
                         st.session_state["paciente_cargado_id"] = None
 
                         resetear_pruebas_funcionales()
@@ -2588,6 +2615,7 @@ with top1:
         st.stop()
 
     paciente_id_preseleccionado = st.session_state.get("paciente_id_seleccionado")
+    paciente_nombre_pendiente = st.session_state.get("paciente_nombre_pendiente")
 
     etiquetas = []
     mapa_etiqueta_id = {}
@@ -2607,6 +2635,11 @@ with top1:
             if p.get("id") == paciente_id_preseleccionado:
                 indice_default = i
                 break
+    elif paciente_nombre_pendiente:
+        for i, p in enumerate(pacientes_filtrados):
+            if str(p.get("nombre", "")).strip().lower() == paciente_nombre_pendiente:
+                indice_default = i
+                break
 
     seleccion = st.selectbox(
         "Seleccionar paciente",
@@ -2620,6 +2653,7 @@ with top1:
     paciente_nombre = paciente_actual["nombre"]
 
     st.session_state["paciente_id_seleccionado"] = paciente_id
+    st.session_state["paciente_nombre_pendiente"] = None
 
 with top4:
     st.markdown("###")
@@ -2639,6 +2673,7 @@ with top4:
                 eliminar_paciente(paciente_id)
 
                 st.session_state["paciente_id_seleccionado"] = None
+                st.session_state["paciente_nombre_pendiente"] = None
                 st.session_state["paciente_cargado_id"] = None
                 st.session_state["mostrar_form_nuevo_paciente"] = False
                 st.session_state["limpiar_busqueda_pendiente"] = True
