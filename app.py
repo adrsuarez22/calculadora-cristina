@@ -2631,24 +2631,23 @@ with top4:
 
     if st.button("Eliminar paciente", key=f"btn_eliminar_paciente_{paciente_id}"):
 
-        if not confirmar_eliminar:
-            st.warning("Marcá la confirmación antes de eliminar.")
+    if not confirmar_eliminar:
+        st.warning("Marcá la confirmación antes de eliminar.")
 
-        else:
-            try:
-                eliminar_paciente(paciente_id)
+    else:
+        try:
+            eliminar_paciente(paciente_id)
 
-                st.session_state["paciente_id_seleccionado"] = None
-                st.session_state["paciente_cargado_id"] = None
-                st.session_state["mostrar_form_nuevo_paciente"] = False
-                st.session_state["limpiar_busqueda_pendiente"] = True
+            st.session_state["paciente_id_seleccionado"] = None
+            st.session_state["paciente_cargado_id"] = None
+            st.session_state["mostrar_form_nuevo_paciente"] = False
+            st.session_state["limpiar_busqueda_pendiente"] = True
 
-                st.success("Paciente eliminado correctamente.")
-                st.rerun()
+            st.success("Paciente eliminado correctamente.")
+            st.rerun()
 
-            except Exception as e:
-                st.error(f"Error al eliminar paciente: {e}")
-
+        except Exception as e:
+            st.error(f"Error al eliminar paciente: {e}")
 # =========================================================
 # FICHA + DATAFRAMES BASE
 # =========================================================
