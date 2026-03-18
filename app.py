@@ -1,4 +1,3 @@
-
 import streamlit as st
 import pandas as pd
 import altair as alt
@@ -2420,10 +2419,17 @@ def generar_informe_integrado_paciente(ficha, df_peso, df_inbody, df_eval, df_me
 
     percentiles_validos = []
     clasificaciones_funcionales = []
+    percentiles_funcionales = {
+        "Caminata 6 minutos": None,
+        "Prensión manual": None,
+        "Levantarse de la silla": None
+    }
 
-    for row in ultimos_funcionales.values():
+    for prueba, row in ultimos_funcionales.items():
         if pd.notna(row.get("percentil")):
-            percentiles_validos.append(float(row.get("percentil")))
+            percentil_valor = float(row.get("percentil"))
+            percentiles_validos.append(percentil_valor)
+            percentiles_funcionales[prueba] = round(percentil_valor, 1)
         if pd.notna(row.get("clasificacion")):
             clasificaciones_funcionales.append(str(row.get("clasificacion")))
 
@@ -2494,6 +2500,7 @@ def generar_informe_integrado_paciente(ficha, df_peso, df_inbody, df_eval, df_me
         "estado_corporal": estado_corporal,
         "peor_percentil": peor_percentil,
         "promedio_percentil": promedio_percentil,
+        "percentiles_funcionales": percentiles_funcionales,
         "comentario_unificado": comentario_unificado,
         "recomendacion_final": recomendacion_final,
         "tabla_resumen": df_resumen
@@ -2828,91 +2835,93 @@ st.markdown("## Ingreso de datos")
 # =========================================================
 st.markdown("### Peso e IMC")
 
-with st.container(border=True):
-    if ficha["talla_m"] is None or float(ficha["talla_m"]) <= 0:
-        st.warning("Este paciente no tiene una talla válida cargada en la tabla pacientes.")
-    else:
-        col_p1, col_p2, col_p3, col_p4, col_p5 = st.columns(5)
+col_peso_ext_1, col_peso_centro, col_peso_ext_2 = st.columns([1, 4, 1])
 
-        with col_p1:
-            fecha_peso = st.date_input(
-                "Fecha de peso",
-                value=date.today(),
-                key=f"fecha_peso_{paciente_id}"
-            )
+with col_peso_centro:
+    with st.container(border=True):
+        if ficha["talla_m"] is None or float(ficha["talla_m"]) <= 0:
+            st.warning("Este paciente no tiene una talla válida cargada en la tabla pacientes.")
+        else:
+            col_p_izq, col_p_der = st.columns([1.35, 1])
 
-        with col_p2:
-            peso_kg = st.number_input(
-                "Peso (kg)",
-                min_value=0.0,
-                max_value=300.0,
-                step=0.1,
-                format="%.1f",
-                key=f"peso_kg_{paciente_id}"
-            )
+            with col_p_izq:
+                fecha_peso = st.date_input(
+                    "Fecha de peso",
+                    value=date.today(),
+                    key=f"fecha_peso_{paciente_id}"
+                )
 
-        with col_p3:
-            cintura_cm = st.number_input(
-                "Cintura (cm)",
-                min_value=0.0,
-                max_value=300.0,
-                step=0.1,
-                format="%.1f",
-                key=f"cintura_cm_{paciente_id}"
-            )
+                peso_kg = st.number_input(
+                    "Peso (kg)",
+                    min_value=0.0,
+                    max_value=300.0,
+                    step=0.1,
+                    format="%.1f",
+                    key=f"peso_kg_{paciente_id}"
+                )
 
-        with col_p4:
-            cadera_cm = st.number_input(
-                "Cadera (cm)",
-                min_value=0.0,
-                max_value=300.0,
-                step=0.1,
-                format="%.1f",
-                key=f"cadera_cm_{paciente_id}"
-            )
+                cintura_cm = st.number_input(
+                    "Cintura (cm)",
+                    min_value=0.0,
+                    max_value=300.0,
+                    step=0.1,
+                    format="%.1f",
+                    key=f"cintura_cm_{paciente_id}"
+                )
 
-        with col_p5:
+                cadera_cm = st.number_input(
+                    "Cadera (cm)",
+                    min_value=0.0,
+                    max_value=300.0,
+                    step=0.1,
+                    format="%.1f",
+                    key=f"cadera_cm_{paciente_id}"
+                )
+
             imc_calculado = round(float(peso_kg) / (float(ficha["talla_m"]) ** 2), 2)
             clasificacion_imc, color_imc = clasificar_imc(imc_calculado)
             icc_calculado = calcular_icc(cintura_cm, cadera_cm)
             ica_calculado = calcular_ica(cintura_cm, ficha["talla_m"])
-            st.markdown(f"**IMC:** {imc_calculado:.2f}")
-            st.markdown(f"**Clasificación:** {color_imc} {clasificacion_imc}")
-            st.markdown(f"**ICC:** {icc_calculado:.2f}" if icc_calculado is not None else "**ICC:** -")
-            st.markdown(f"**Riesgo ICC:** {clasificacion_icc(ficha['sexo'], icc_calculado)}")
-            st.markdown(f"**ICA:** {ica_calculado:.2f}" if ica_calculado is not None else "**ICA:** -")
-            st.markdown(f"**Riesgo ICA:** {clasificacion_ica(ica_calculado)}")
 
-        bp1, bp2 = st.columns(2)
+            with col_p_der:
+                st.markdown("#### Resultados")
+                st.markdown(f"**IMC:** {imc_calculado:.2f}")
+                st.markdown(f"**Clasificación:** {color_imc} {clasificacion_imc}")
+                st.markdown(f"**ICC:** {icc_calculado:.2f}" if icc_calculado is not None else "**ICC:** -")
+                st.markdown(f"**Riesgo ICC:** {clasificacion_icc(ficha['sexo'], icc_calculado)}")
+                st.markdown(f"**ICA:** {ica_calculado:.2f}" if ica_calculado is not None else "**ICA:** -")
+                st.markdown(f"**Riesgo ICA:** {clasificacion_ica(ica_calculado)}")
 
-        with bp1:
-            if st.button("Guardar peso", key=f"btn_guardar_peso_{paciente_id}"):
-                try:
-                    guardar_peso(
-                        paciente_id=paciente_id,
-                        fecha_medicion=fecha_peso,
-                        peso_kg=peso_kg,
-                        talla_m=ficha["talla_m"],
-                        cintura_cm=cintura_cm,
-                        cadera_cm=cadera_cm
-                    )
-                    st.success("Peso guardado correctamente.")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Error al guardar peso: {e}")
+            bp1, bp2 = st.columns(2)
 
-        with bp2:
-            if st.button(
-                "Borrar último peso",
-                key=f"btn_borrar_ultimo_peso_{paciente_id}",
-                disabled=ultimo_id_peso is None
-            ):
-                try:
-                    eliminar_registro_peso(ultimo_id_peso)
-                    st.success("Último registro de peso eliminado.")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Error al borrar último peso: {e}")
+            with bp1:
+                if st.button("Guardar peso", key=f"btn_guardar_peso_{paciente_id}"):
+                    try:
+                        guardar_peso(
+                            paciente_id=paciente_id,
+                            fecha_medicion=fecha_peso,
+                            peso_kg=peso_kg,
+                            talla_m=ficha["talla_m"],
+                            cintura_cm=cintura_cm,
+                            cadera_cm=cadera_cm
+                        )
+                        st.success("Peso guardado correctamente.")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Error al guardar peso: {e}")
+
+            with bp2:
+                if st.button(
+                    "Borrar último peso",
+                    key=f"btn_borrar_ultimo_peso_{paciente_id}",
+                    disabled=ultimo_id_peso is None
+                ):
+                    try:
+                        eliminar_registro_peso(ultimo_id_peso)
+                        st.success("Último registro de peso eliminado.")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Error al borrar último peso: {e}")
 
 
 
@@ -3633,15 +3642,15 @@ ii1, ii2, ii3 = st.columns(3)
 with ii1:
     with st.container(border=True):
         st.markdown("#### Funcional")
-        if informe_integrado["promedio_percentil"] is not None:
-            st.write(f"**Promedio percentilar:** P{informe_integrado['promedio_percentil']}")
-        else:
-            st.write("**Promedio percentilar:** -")
+        percentiles_funcionales = informe_integrado.get("percentiles_funcionales", {})
 
-        if informe_integrado["peor_percentil"] is not None:
-            st.write(f"**Peor percentil:** P{round(informe_integrado['peor_percentil'], 1)}")
-        else:
-            st.write("**Peor percentil:** -")
+        p_caminata = percentiles_funcionales.get("Caminata 6 minutos")
+        p_prension = percentiles_funcionales.get("Prensión manual")
+        p_silla = percentiles_funcionales.get("Levantarse de la silla")
+
+        st.write(f"**Caminata 6 min:** {f'P{p_caminata}' if p_caminata is not None else '-'}")
+        st.write(f"**Prensión manual:** {f'P{p_prension}' if p_prension is not None else '-'}")
+        st.write(f"**Levantarse silla:** {f'P{p_silla}' if p_silla is not None else '-'}")
 
 with ii2:
     with st.container(border=True):
