@@ -160,6 +160,22 @@ h1, h2, h3 {
     letter-spacing: -0.02em;
 }
 
+h1 {
+    font-size: 2.35rem !important;
+}
+
+h2 {
+    font-size: 1.9rem !important;
+}
+
+h3 {
+    font-size: 1.55rem !important;
+}
+
+label, .stMarkdown p, .stCaption, .stTextInput label, .stNumberInput label, .stDateInput label, .stSelectbox label, .stCheckbox label {
+    font-size: 1.02rem !important;
+}
+
 .result-card {
     padding: 14px 16px;
     border-radius: 12px;
@@ -181,14 +197,14 @@ h1, h2, h3 {
 }
 
 .soft-card-title {
-    font-size: 14px;
+    font-size: 15px;
     font-weight: 700;
     color: #344054;
     margin-bottom: 10px;
 }
 
 .soft-card-value {
-    font-size: 24px;
+    font-size: 27px;
     font-weight: 800;
     color: #101828;
     line-height: 1.1;
@@ -196,16 +212,16 @@ h1, h2, h3 {
 }
 
 .soft-card-meta {
-    font-size: 13px;
+    font-size: 14px;
     color: #475467;
     line-height: 1.5;
 }
 
 .section-subtle {
-    font-size: 12px;
+    font-size: 14px;
     color: #667085;
-    margin-top: -6px;
-    margin-bottom: 8px;
+    margin-top: -2px;
+    margin-bottom: 12px;
 }
 
 .motivo-box {
@@ -3031,7 +3047,15 @@ if not df_peso_hist.empty:
     df_peso_hist["fecha"] = pd.to_datetime(df_peso_hist["fecha"], errors="coerce")
     df_peso_hist = df_peso_hist.dropna(subset=["fecha"]).sort_values("fecha", ascending=False)
 
-    st.markdown("**Fecha | Peso | IMC | Cintura | Cadera | ICC | ICA | Eliminar**")
+    encabezado_1, encabezado_2, encabezado_3, encabezado_4, encabezado_5, encabezado_6, encabezado_7, encabezado_8 = st.columns([1.2, 0.9, 0.9, 0.9, 0.9, 0.8, 0.8, 0.5])
+    encabezado_1.markdown("**Fecha**")
+    encabezado_2.markdown("**Peso**")
+    encabezado_3.markdown("**IMC**")
+    encabezado_4.markdown("**Cintura**")
+    encabezado_5.markdown("**Cadera**")
+    encabezado_6.markdown("**ICC**")
+    encabezado_7.markdown("**ICA**")
+    encabezado_8.markdown("**Eliminar**")
 
     for _, row in df_peso_hist.iterrows():
         c1, c2, c3, c4, c5, c6, c7, c8 = st.columns([1.2, 0.9, 0.9, 0.9, 0.9, 0.8, 0.8, 0.5])
