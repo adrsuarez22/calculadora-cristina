@@ -2827,91 +2827,93 @@ st.markdown("## Ingreso de datos")
 # =========================================================
 st.markdown("### Peso e IMC")
 
-with st.container(border=True):
-    if ficha["talla_m"] is None or float(ficha["talla_m"]) <= 0:
-        st.warning("Este paciente no tiene una talla válida cargada en la tabla pacientes.")
-    else:
-        col_p1, col_p2, col_p3, col_p4, col_p5 = st.columns(5)
+col_peso_ext_1, col_peso_centro, col_peso_ext_2 = st.columns([1, 4, 1])
 
-        with col_p1:
-            fecha_peso = st.date_input(
-                "Fecha de peso",
-                value=date.today(),
-                key=f"fecha_peso_{paciente_id}"
-            )
+with col_peso_centro:
+    with st.container(border=True):
+        if ficha["talla_m"] is None or float(ficha["talla_m"]) <= 0:
+            st.warning("Este paciente no tiene una talla válida cargada en la tabla pacientes.")
+        else:
+            col_p_izq, col_p_der = st.columns([1.35, 1])
 
-        with col_p2:
-            peso_kg = st.number_input(
-                "Peso (kg)",
-                min_value=0.0,
-                max_value=300.0,
-                step=0.1,
-                format="%.1f",
-                key=f"peso_kg_{paciente_id}"
-            )
+            with col_p_izq:
+                fecha_peso = st.date_input(
+                    "Fecha de peso",
+                    value=date.today(),
+                    key=f"fecha_peso_{paciente_id}"
+                )
 
-        with col_p3:
-            cintura_cm = st.number_input(
-                "Cintura (cm)",
-                min_value=0.0,
-                max_value=300.0,
-                step=0.1,
-                format="%.1f",
-                key=f"cintura_cm_{paciente_id}"
-            )
+                peso_kg = st.number_input(
+                    "Peso (kg)",
+                    min_value=0.0,
+                    max_value=300.0,
+                    step=0.1,
+                    format="%.1f",
+                    key=f"peso_kg_{paciente_id}"
+                )
 
-        with col_p4:
-            cadera_cm = st.number_input(
-                "Cadera (cm)",
-                min_value=0.0,
-                max_value=300.0,
-                step=0.1,
-                format="%.1f",
-                key=f"cadera_cm_{paciente_id}"
-            )
+                cintura_cm = st.number_input(
+                    "Cintura (cm)",
+                    min_value=0.0,
+                    max_value=300.0,
+                    step=0.1,
+                    format="%.1f",
+                    key=f"cintura_cm_{paciente_id}"
+                )
 
-        with col_p5:
+                cadera_cm = st.number_input(
+                    "Cadera (cm)",
+                    min_value=0.0,
+                    max_value=300.0,
+                    step=0.1,
+                    format="%.1f",
+                    key=f"cadera_cm_{paciente_id}"
+                )
+
             imc_calculado = round(float(peso_kg) / (float(ficha["talla_m"]) ** 2), 2)
             clasificacion_imc, color_imc = clasificar_imc(imc_calculado)
             icc_calculado = calcular_icc(cintura_cm, cadera_cm)
             ica_calculado = calcular_ica(cintura_cm, ficha["talla_m"])
-            st.markdown(f"**IMC:** {imc_calculado:.2f}")
-            st.markdown(f"**Clasificación:** {color_imc} {clasificacion_imc}")
-            st.markdown(f"**ICC:** {icc_calculado:.2f}" if icc_calculado is not None else "**ICC:** -")
-            st.markdown(f"**Riesgo ICC:** {clasificacion_icc(ficha['sexo'], icc_calculado)}")
-            st.markdown(f"**ICA:** {ica_calculado:.2f}" if ica_calculado is not None else "**ICA:** -")
-            st.markdown(f"**Riesgo ICA:** {clasificacion_ica(ica_calculado)}")
 
-        bp1, bp2 = st.columns(2)
+            with col_p_der:
+                st.markdown("#### Resultados")
+                st.markdown(f"**IMC:** {imc_calculado:.2f}")
+                st.markdown(f"**Clasificación:** {color_imc} {clasificacion_imc}")
+                st.markdown(f"**ICC:** {icc_calculado:.2f}" if icc_calculado is not None else "**ICC:** -")
+                st.markdown(f"**Riesgo ICC:** {clasificacion_icc(ficha['sexo'], icc_calculado)}")
+                st.markdown(f"**ICA:** {ica_calculado:.2f}" if ica_calculado is not None else "**ICA:** -")
+                st.markdown(f"**Riesgo ICA:** {clasificacion_ica(ica_calculado)}")
 
-        with bp1:
-            if st.button("Guardar peso", key=f"btn_guardar_peso_{paciente_id}"):
-                try:
-                    guardar_peso(
-                        paciente_id=paciente_id,
-                        fecha_medicion=fecha_peso,
-                        peso_kg=peso_kg,
-                        talla_m=ficha["talla_m"],
-                        cintura_cm=cintura_cm,
-                        cadera_cm=cadera_cm
-                    )
-                    st.success("Peso guardado correctamente.")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Error al guardar peso: {e}")
+            bp1, bp2 = st.columns(2)
 
-        with bp2:
-            if st.button(
-                "Borrar último peso",
-                key=f"btn_borrar_ultimo_peso_{paciente_id}",
-                disabled=ultimo_id_peso is None
-            ):
-                try:
-                    eliminar_registro_peso(ultimo_id_peso)
-                    st.success("Último registro de peso eliminado.")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Error al borrar último peso: {e}")
+            with bp1:
+                if st.button("Guardar peso", key=f"btn_guardar_peso_{paciente_id}"):
+                    try:
+                        guardar_peso(
+                            paciente_id=paciente_id,
+                            fecha_medicion=fecha_peso,
+                            peso_kg=peso_kg,
+                            talla_m=ficha["talla_m"],
+                            cintura_cm=cintura_cm,
+                            cadera_cm=cadera_cm
+                        )
+                        st.success("Peso guardado correctamente.")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Error al guardar peso: {e}")
+
+            with bp2:
+                if st.button(
+                    "Borrar último peso",
+                    key=f"btn_borrar_ultimo_peso_{paciente_id}",
+                    disabled=ultimo_id_peso is None
+                ):
+                    try:
+                        eliminar_registro_peso(ultimo_id_peso)
+                        st.success("Último registro de peso eliminado.")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Error al borrar último peso: {e}")
 
 
 
