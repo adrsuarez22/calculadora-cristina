@@ -139,7 +139,8 @@ st.set_page_config(
 st.markdown("""
 <style>
 [data-testid="stAppViewContainer"] {
-    background-color: #f7f8fa;
+    background-color: #eef2f7;
+    color: #1f2937;
 }
 
 [data-testid="stHeader"] {
@@ -156,6 +157,26 @@ st.markdown("""
     max-width: 1400px;
 }
 
+h1, h2, h3, h4 {
+    color: #18212f;
+}
+
+p, label, .stMarkdown, .stCaption {
+    color: #334155;
+}
+
+[data-testid="stVerticalBlockBorderWrapper"] {
+    background-color: #ffffff;
+    border: 1px solid #d7dee8;
+    border-radius: 12px;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+[data-testid="stDataFrame"] {
+    background-color: #ffffff;
+    border-radius: 12px;
+}
+
 .result-card {
     padding: 14px 16px;
     border-radius: 10px;
@@ -167,7 +188,7 @@ st.markdown("""
 
 .motivo-box {
     background-color: #ffffff;
-    border: 1px solid #e6e9ef;
+    border: 1px solid #d7dee8;
     border-radius: 10px;
     padding: 12px 14px;
     margin-bottom: 12px;
@@ -175,7 +196,7 @@ st.markdown("""
 
 .reco-box {
     background-color: #eef7ef;
-    border: 1px solid #d4ead7;
+    border: 1px solid #cfe3d2;
     border-radius: 10px;
     padding: 12px 14px;
     margin-bottom: 14px;
