@@ -2659,7 +2659,6 @@ with top1:
     seleccion = st.selectbox(
         "Seleccionar paciente",
         etiquetas,
-        index=indice_default,
         key="selector_paciente"
     )
 
